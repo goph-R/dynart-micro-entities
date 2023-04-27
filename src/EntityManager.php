@@ -7,30 +7,26 @@ use Dynart\Micro\Database;
 
 class EntityManager {
 
-    /**
-     * @var Config
-     */
+    /** @var Config */
     protected $config;
 
-    /**
-     * @var Database
-     */
-    protected $database;
+    /** @var Database */
+    protected $db;
 
-    /**
-     * @var array
-     */
-    protected $tables;
+    /** @var array */
+    protected $tables = [];
 
-    public function __construct(Config $config, Database $database) {
+    protected $tableNamePrefix = '';
+
+    public function __construct(Config $config, Database $db) {
         $this->config = $config;
-        $this->db = $database;
+        $this->db = $db;
+        $this->tableNamePrefix = $db->configValue('table_prefix');
     }
 
-    public function addColumn($className, $propertyName, $columnJsonData) {
-        $tableName = strtolower($className);
+    public function addColumn(string $className, string $propertyName, array $columnData) {
+        $tableName = $this->tableNameByClass($className);
         $columnName = strtolower($propertyName);
-        $columnData = json_decode($columnJsonData);
         if (!array_key_exists($tableName, $this->tables)) {
             $this->tables[$tableName] = [];
         }
@@ -40,7 +36,9 @@ class EntityManager {
         $this->tables[$tableName][$columnName] = $columnData;
     }
 
-    // TODO: multiple column primary keys (PK name and value is an array then)
+    /*
+     * TODO: multiple column primary keys (PK name and value is an array then)
+     */
 
     public function primaryKeyValue(string $tableName, array $data) {
         return $data['id'];
@@ -58,11 +56,9 @@ class EntityManager {
         return 'id';
     }
 
-    public function isNew($entity, $tableName) {
-        return $entity->id === null;
-    }
-
-    // TODO end
+    /*
+     * /TODO
+     */
 
     public function isPrimaryKeyAutoIncrement(string $tableName): string {
         $pkName = $this->primaryKeyName($tableName);
@@ -73,45 +69,17 @@ class EntityManager {
         return array_key_exists('autoIncrement', $pkColumn) ? $pkColumn['autoIncrement'] : false;
     }
 
-    public function tableNameByClass(string $className) {
+    public function tableNameByClass(string $className): string {
         return strtolower(substr(strrchr($className, '\\'), 1));
     }
 
-    // example: $entityManager->save($user)
-
-    /**
-     * @param $entity
-     * @param bool $inTransaction
-     * @throws \Exception
-     */
-    public function save($entity, bool $inTransaction = true) {
+    public function save(Entity $entity) {
         $tableName = $this->tableNameByClass(get_class($entity));
         if (!array_key_exists($tableName, $this->tables)) {
             throw new EntityManagerException("Entity type doesn't exists: $tableName");
         }
-        if ($inTransaction) {
-            $this->db->beginTransaction();
-        }
-        try {
-            $this->saveEntity($entity, $tableName);
-            if ($inTransaction) {
-                $this->db->commit();
-            }
-        } catch (\Exception $e) {
-            if ($inTransaction) {
-                $this->db->rollBack();
-            }
-            throw $e;
-        }
-    }
-
-    protected function saveEntity($entity, $tableName) {
-        $isNew = $this->isNew($entity, $tableName);
-        if (method_exists($entity, 'beforeSave')) {
-            $entity->beforeSave($isNew);
-        }
         $data = $this->fetchDataArray($entity, $tableName);
-        if ($isNew) {
+        if ($entity->isNew) {
             $this->db->insert($tableName, $data);
             if ($this->isPrimaryKeyAutoIncrement($tableName)) {
                 $pkName = $this->primaryKeyName($tableName);
@@ -119,18 +87,14 @@ class EntityManager {
             }
         } else {
             $this->db->update(
-                $tableName,
-                $data,
+                $tableName, $data,
                 $this->primaryKeyCondition($tableName),
                 $this->primaryKeyConditionParams($tableName, $this->primaryKeyValue($tableName, $data))
             );
         }
-        if (method_exists($entity, 'afterSave')) {
-            $entity->afterSave($isNew);
-        }
     }
 
-    protected function fetchDataArray($entity, $tableName) {
+    protected function fetchDataArray(Entity $entity, $tableName) {
         $columnKeys = array_keys($this->tables[$tableName]);
         $data = [];
         foreach ($columnKeys as $ck) {
@@ -139,12 +103,16 @@ class EntityManager {
         return $data;
     }
 
-    // example: $entityManager->findById(User::class, 123)
-
     public function findById(string $className, $id) {
         $tableName = $this->tableNameByClass($className);
-        $sql = "select * from ".$this->db->escapeName($tableName)." where ";
+        $sql = "select * from ".$this->db->escapeName($this->tableNamePrefix.$tableName)." where ";
         $sql .= $this->primaryKeyCondition($tableName);
-        return $this->db->fetch($sql, $this->primaryKeyConditionParams($tableName, $pkValue), $className); // TODO: fetch with object type
+        $result = $this->db->fetch($sql, $this->primaryKeyConditionParams($tableName, $id), $className);
+        $result->isNew = false;
+        return $result;
+    }
+
+    public function tables() {
+        return $this->tables;
     }
 }

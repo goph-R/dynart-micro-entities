@@ -7,9 +7,7 @@ use Dynart\Micro\AppException;
 
 class ColumnAnnotation implements Annotation {
 
-    /**
-     * @var EntityManager
-     */
+    /** @var EntityManager */
     protected $entityManager;
 
     public function __construct(EntityManager $entityManager) {
@@ -21,17 +19,16 @@ class ColumnAnnotation implements Annotation {
     }
 
     public function regex(): string {
-        return '\{.*\}';
+        return '(.*)';
     }
 
     public function types(): array {
         return [Annotation::TYPE_PROPERTY];
     }
 
-    public function process(string $type, string $interface, $subject, string $comment, array $matches): void {
+    public function process(string $type, string $className, $subject, string $comment, array $matches): void {
         if ($matches) {
-            // ...
-            $this->entityManager->addColumn($interface, $propertyName, $columnJsonData);
+            $this->entityManager->addColumn($className, $subject->getName(), json_decode($matches[1], true));
         } else {
             throw new AppException("Invalid column annotation in comment: $comment");
         }

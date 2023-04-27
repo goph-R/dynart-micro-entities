@@ -1,0 +1,31 @@
+{
+    "name": "dynart/micro-entities",
+    "description": "Entity manager for Micro",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Dynart\\Micro\\Entities\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "gopher",
+            "email": "gopher.hu@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=7.1.0",
+        "dynart/micro": "@stable"
+    },
+    "repositories": {
+        "dynart-micro": {
+            "type": "path",
+            "url": "../dynart-micro",
+            "options": {
+                "symlink": true
+            }
+        }
+    }
+}

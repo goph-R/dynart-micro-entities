@@ -54,10 +54,9 @@ class EntityManager {
         $this->tableNamePrefix = $db->configValue('table_prefix');
     }
 
-    public function addColumn(string $className, string $propertyName, array $columnData) {
-        $columnName = strtolower($propertyName);
+    public function addColumn(string $className, string $columnName, array $columnData) {
         if (!array_key_exists($className, $this->tableNames)) {
-            $this->tableNames[$className] = $this->createTableNameByClass($className);
+            $this->tableNames[$className] = $this->tableNameByClass($className);
             $this->tableColumns[$className] = [];
         }
         if (!array_key_exists($columnName, $this->tableColumns[$className])) {
@@ -66,8 +65,8 @@ class EntityManager {
         $this->tableColumns[$className][$columnName] = $columnData;
     }
 
-    public function createTableNameByClass(string $className): string {
-        return $this->tableNamePrefix.strtolower(substr(strrchr($className, '\\'), 1));
+    public function tableNameByClass(string $className, bool $withPrefix = true): string {
+        return ($withPrefix ? $this->tableNamePrefix : '').strtolower(substr(strrchr($className, '\\'), 1));
     }
 
     public function tableNames() {
@@ -98,7 +97,7 @@ class EntityManager {
                 $primaryKey[] = $columnName;
             }
         }
-        $result = count($primaryKey) > 1 ? $primaryKey : $primaryKey[0];
+        $result = empty($primaryKey) ? null : (count($primaryKey) > 1 ? $primaryKey : $primaryKey[0]);
         $this->primaryKeys[$className] = $result;
         return $result;
     }

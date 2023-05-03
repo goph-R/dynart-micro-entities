@@ -15,7 +15,8 @@ abstract class QueryBuilder {
     protected $em;
 
     abstract public function columnDefinition(string $columnName, array $columnData): string;
-    abstract public function keyDefinition(string $columnName, array $columnData): string;
+    abstract public function primaryKeyDefinition(string $className): string;
+    abstract public function foreignKeyDefinition(string $columnName, array $columnData): string;
 
     public function __construct(Database $db, EntityManager $em) {
         $this->db = $db;
@@ -23,20 +24,24 @@ abstract class QueryBuilder {
     }
 
     public function createTable(string $className): string {
-        $allColumnDefinitions = [];
-        $allKeyDefinitions = [];
+        $allColumnDef = [];
+        $allForeignKeyDef = [];
         foreach ($this->em->tableColumns($className) as $columnName => $columnData) {
-            $allColumnDefinitions[] = self::INDENTATION.$this->columnDefinition($columnName, $columnData);
-            $keyDefinition = $this->keyDefinition($columnName, $columnData);
-            if ($keyDefinition) {
-                $allKeyDefinitions[] = self::INDENTATION.$keyDefinition;
+            $allColumnDef[] = self::INDENTATION.$this->columnDefinition($columnName, $columnData);
+            $foreignKeyDef = $this->foreignKeyDefinition($columnName, $columnData);
+            if ($foreignKeyDef) {
+                $allForeignKeyDef[] = self::INDENTATION.$foreignKeyDef;
             }
         }
-        $safeTableName = $this->db->escapeName($this->em->createTableNameByClass($className));
+        $primaryKeyDef = $this->primaryKeyDefinition($className);
+        $safeTableName = $this->db->escapeName($this->em->tableNameByClass($className));
         $result = "create table $safeTableName (\n";
-        $result .= join(",\n", $allColumnDefinitions);
-        if (!empty($allKeyDefinitions)) {
-            $result .= ",\n".join(",\n", $allKeyDefinitions);
+        $result .= join(",\n", $allColumnDef);
+        if ($primaryKeyDef) {
+            $result .= ",\n".self::INDENTATION.$primaryKeyDef;
+        }
+        if (!empty($allForeignKeyDef)) {
+            $result .= ",\n".join(",\n", $allForeignKeyDef);
         }
         $result .= "\n)";
         return $result;
@@ -56,7 +61,6 @@ abstract class QueryBuilder {
 
         "primaryKey": true | false
         "foreignKey": ["tableName", "columnName"]
-        "index": true | false
 
     createTable($tableName, $tableData) "create table !tableName ( !allColumnDefinitions !allKeyDefinitions )"
 

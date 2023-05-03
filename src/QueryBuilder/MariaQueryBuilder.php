@@ -32,34 +32,51 @@ class MariaQueryBuilder extends QueryBuilder {
         return join(' ', $parts);
     }
 
-    public function keyDefinition(string $columnName, array $columnData): string {
-        $parts = [];
-        if ($this->em->isColumn($columnData, EntityManager::COLUMN_PRIMARY_KEY)) {
-            $parts[] = 'primary key ('.$this->db->escapeName($columnName).')';
+    public function primaryKeyDefinition(string $className): string {
+        $result = '';
+        $primaryKey = $this->em->primaryKey($className);
+        if (!$primaryKey) {
+            return $result;
         }
-        if (array_key_exists(EntityManager::COLUMN_FOREIGN_KEY, $columnData)) {
-            if (!is_array($columnData[EntityManager::COLUMN_FOREIGN_KEY])) {
-                throw new EntityManagerException("Foreign key definition must be an array: ".$columnName);
+        $result = 'primary key (';
+        if (is_array($primaryKey)) {
+            $pks = [];
+            foreach ($primaryKey as $pk) {
+                $pks[] = $this->db->escapeName($pk);
             }
-            if (count($columnData[EntityManager::COLUMN_FOREIGN_KEY]) != 2) {
-                throw new EntityManagerException("Foreign key definition array size must be 2: ".$columnName);
-            }
-            list($foreignClassName, $foreignColumnName) = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
-            $part = 'foreign key '.$this->db->escapeName($columnName)
-                .' references '.$this->db->escapeName($this->em->createTableNameByClass($foreignClassName))
-                .' ('.$this->db->escapeName($foreignColumnName).')';
-            if (array_key_exists(EntityManager::COLUMN_ON_DELETE, $columnData)) {
-                $part .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_DELETE]);
-            }
-            if (array_key_exists(EntityManager::COLUMN_ON_UPDATE, $columnData)) {
-                $part .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_UPDATE]);
-            }
-            $parts[] = $part;
+            $result .= join(', ', $pks);
+        } else {
+            $result .= $this->db->escapeName($primaryKey);
         }
-        return join(",\n", $parts);
+        $result .= ')';
+        return $result;
     }
 
-    protected function sqlType(string $type, int $size, bool $fixSize) {
+    public function foreignKeyDefinition(string $columnName, array $columnData): string {
+        $result = '';
+        if (!array_key_exists(EntityManager::COLUMN_FOREIGN_KEY, $columnData)) {
+            return $result;
+        }
+        if (!is_array($columnData[EntityManager::COLUMN_FOREIGN_KEY])) {
+            throw new EntityManagerException("Foreign key definition must be an array: ".$columnName);
+        }
+        if (count($columnData[EntityManager::COLUMN_FOREIGN_KEY]) != 2) {
+            throw new EntityManagerException("Foreign key definition array size must be 2: ".$columnName);
+        }
+        list($foreignClassName, $foreignColumnName) = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
+        $result = 'foreign key '.$this->db->escapeName($columnName)
+            .' references '.$this->db->escapeName($this->em->tableNameByClass($foreignClassName))
+            .' ('.$this->db->escapeName($foreignColumnName).')';
+        if (array_key_exists(EntityManager::COLUMN_ON_DELETE, $columnData)) {
+            $result .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_DELETE]);
+        }
+        if (array_key_exists(EntityManager::COLUMN_ON_UPDATE, $columnData)) {
+            $result .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_UPDATE]);
+        }
+        return $result;
+    }
+
+    protected function sqlType(string $type, int $size, bool $fixSize): string {
         switch ($type) {
             case EntityManager::TYPE_INT:
                 return $size ? "int($size)" : 'int';
@@ -80,36 +97,36 @@ class MariaQueryBuilder extends QueryBuilder {
             case EntityManager::TYPE_BLOB:
                 return 'blob';
             default:
-                throw new EntityManagerException("Unknown type: ".$type);
+                throw new EntityManagerException("Unknown type: $type");
         }
     }
 
-    protected function sqlAction(string $action) {
+    protected function sqlAction(string $action): string {
         switch ($action) {
             case EntityManager::ACTION_CASCADE:
                 return 'cascade';
             case EntityManager::ACTION_SET_NULL:
                 return 'set null';
             default:
-                throw new EntityManagerException('Unknown action: '.$action);
+                throw new EntityManagerException("Unknown action: $action");
         }
     }
 
-    protected function sqlDefaultValue($value, $type, $size) {
+    protected function sqlDefaultValue($value, string $type, int $size): string {
         $isLongText = $type == EntityManager::TYPE_STRING && !$size;
         $isBlob = $type == EntityManager::TYPE_BLOB;
         if ($isLongText || $isBlob) {
-            throw new EntityManagerException("Text and blob types can't have default value");
+            throw new EntityManagerException("Text and blob types can't have a default value");
         }
         $isDate = in_array($type, [EntityManager::TYPE_DATE, EntityManager::TYPE_TIME, EntityManager::TYPE_DATETIME]);
         if ($value === null) {
-            $value = 'null';
+            return 'null';
         } else if ($type == EntityManager::TYPE_STRING) {
-            $value = '"' . str_replace('"', '\"', $value) . '"';
+            return "'".str_replace("'", "\\'", $value)."'";
         } else if ($isDate && $value == EntityManager::DEFAULT_NOW) {
-            $value = 'now()';
+            return 'now()';
         } else if ($type == EntityManager::TYPE_BOOL) {
-            $value = $value ? '1' : '0';
+            return $value ? '1' : '0';
         }
         return $value;
     }

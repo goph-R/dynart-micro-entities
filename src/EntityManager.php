@@ -7,8 +7,29 @@ use Dynart\Micro\Database;
 
 class EntityManager {
 
-    const COLUMN_PRIMARY_KEY = 'primaryKey';
+    const COLUMN_TYPE = 'type';
+    const COLUMN_SIZE = 'size';
+    const COLUMN_FIX_SIZE = 'fixSize';
+    const COLUMN_NOT_NULL = 'notNull';
     const COLUMN_AUTO_INCREMENT = 'autoIncrement';
+    const COLUMN_DEFAULT = 'default';
+    const COLUMN_PRIMARY_KEY = 'primaryKey';
+    const COLUMN_FOREIGN_KEY = 'foreignKey';
+    const COLUMN_ON_DELETE = 'onDelete';
+    const COLUMN_ON_UPDATE = 'onUpdate';
+
+    const TYPE_INT = 'int';
+    const TYPE_STRING = 'string';
+    const TYPE_BOOL = 'bool';
+    const TYPE_DATE = 'date';
+    const TYPE_TIME = 'time';
+    const TYPE_DATETIME = 'datetime';
+    const TYPE_BLOB = 'blob';
+
+    const DEFAULT_NOW = 'now';
+
+    const ACTION_CASCADE = 'cascade';
+    const ACTION_SET_NULL = 'set_null';
 
     /** @var Config */
     protected $config;
@@ -82,8 +103,8 @@ class EntityManager {
         return $result;
     }
 
-    protected function isColumn(array $column, string $boolName) {
-        return array_key_exists($boolName, $column) && $column[$boolName] === true;
+    public function isColumn(array $column, string $name) {
+        return array_key_exists($name, $column) && $column[$name] === true;
     }
 
     public function primaryKeyValue(string $className, array $data) {
@@ -153,7 +174,18 @@ class EntityManager {
         }
     }
 
-    protected function fetchDataArray(Entity $entity) {
+    public function setByDataArray(Entity $entity, array $data) {
+        $className = get_class($entity);
+        $columnKeys = array_keys($this->tableColumns($className));
+        foreach ($data as $n => $v) {
+            if (!array_key_exists($n, $columnKeys)) {
+                throw new EntityManagerException("Column '$n' doesn't exist in $className");
+            }
+            $entity->$n = $v;
+        }
+    }
+
+    public function fetchDataArray(Entity $entity) {
         $columnKeys = array_keys($this->tableColumns(get_class($entity)));
         $data = [];
         foreach ($columnKeys as $ck) {

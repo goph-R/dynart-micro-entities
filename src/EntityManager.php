@@ -22,7 +22,7 @@ class EntityManager {
     const TYPE_LONG = 'long';
     const TYPE_FLOAT = 'float';
     const TYPE_DOUBLE = 'double';
-    const TYPE_DECIMAL = 'decimal';
+    const TYPE_NUMERIC = 'numeric';
     const TYPE_STRING = 'string';
     const TYPE_BOOL = 'bool';
     const TYPE_DATE = 'date';
@@ -197,12 +197,15 @@ class EntityManager {
         return $data;
     }
 
+    public function safeTableName(string $className): string {
+        return $this->db->escapeName($this->tableNameByClass($className));
+    }
+
     public function findById(string $className, $id) {
-        $sql = "select * from !tableName where !conditions";
-        $params = array_merge($this->primaryKeyConditionParams($className, $id), [
-            '!tableName'  => $this->db->escapeName($this->tableName($className)),
-            '!conditions' => $this->primaryKeyCondition($className)
-        ]);
+        $conditions = $this->primaryKeyCondition($className);
+        $safeTableName = $this->safeTableName($className);
+        $sql = "select * from $safeTableName where $conditions";
+        $params = array_merge($this->primaryKeyConditionParams($className, $id));
         $result = $this->db->fetch($sql, $params, $className);
         $result->setNew(false);
         return $result;

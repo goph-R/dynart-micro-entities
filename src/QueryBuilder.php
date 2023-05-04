@@ -12,21 +12,30 @@ abstract class QueryBuilder {
     protected $db;
 
     /** @var EntityManager */
-    protected $em;
+    protected $entityManager;
+
+    /** @var string */
+    protected $currentClassNameForException;
+
+    /** @var string */
+    protected $currentColumnNameForException;
 
     abstract public function columnDefinition(string $columnName, array $columnData): string;
     abstract public function primaryKeyDefinition(string $className): string;
     abstract public function foreignKeyDefinition(string $columnName, array $columnData): string;
+    abstract public function isTableExist(string $className, string $dbNameParam, string $tableNameParam): string;
 
-    public function __construct(Database $db, EntityManager $em) {
+    public function __construct(Database $db, EntityManager $entityManager) {
         $this->db = $db;
-        $this->em = $em;
+        $this->entityManager = $entityManager;
     }
 
-    public function createTable(string $className): string {
+    public function createTable(string $className, bool $ifNotExists = false): string {
+        $this->currentClassNameForException = $className;
         $allColumnDef = [];
         $allForeignKeyDef = [];
-        foreach ($this->em->tableColumns($className) as $columnName => $columnData) {
+        foreach ($this->entityManager->tableColumns($className) as $columnName => $columnData) {
+            $this->currentColumnNameForException = $columnName;
             $allColumnDef[] = self::INDENTATION.$this->columnDefinition($columnName, $columnData);
             $foreignKeyDef = $this->foreignKeyDefinition($columnName, $columnData);
             if ($foreignKeyDef) {
@@ -34,8 +43,12 @@ abstract class QueryBuilder {
             }
         }
         $primaryKeyDef = $this->primaryKeyDefinition($className);
-        $safeTableName = $this->db->escapeName($this->em->tableNameByClass($className));
-        $result = "create table $safeTableName (\n";
+        $safeTableName = $this->db->escapeName($this->entityManager->tableNameByClass($className));
+        $result = "create table ";
+        if ($ifNotExists) {
+            $result .= "if not exists ";
+        }
+        $result .= "$safeTableName (\n";
         $result .= join(",\n", $allColumnDef);
         if ($primaryKeyDef) {
             $result .= ",\n".self::INDENTATION.$primaryKeyDef;
@@ -46,6 +59,12 @@ abstract class QueryBuilder {
         $result .= "\n)";
         return $result;
     }
+
+    protected function currentColumnForException() {
+        return $this->currentClassNameForException.'::'.$this->currentColumnNameForException;
+    }
+
+
 /*
     tableData format:
         "columnName1": columnData1

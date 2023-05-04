@@ -19,6 +19,10 @@ class EntityManager {
     const COLUMN_ON_UPDATE = 'onUpdate';
 
     const TYPE_INT = 'int';
+    const TYPE_LONG = 'long';
+    const TYPE_FLOAT = 'float';
+    const TYPE_DOUBLE = 'double';
+    const TYPE_DECIMAL = 'decimal';
     const TYPE_STRING = 'string';
     const TYPE_BOOL = 'bool';
     const TYPE_DATE = 'date';

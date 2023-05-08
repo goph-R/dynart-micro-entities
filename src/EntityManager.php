@@ -197,8 +197,8 @@ class EntityManager {
         return $data;
     }
 
-    public function safeTableName(string $className): string {
-        return $this->db->escapeName($this->tableNameByClass($className));
+    public function safeTableName(string $className, bool $withPrefix = true): string {
+        return $this->db->escapeName($this->tableNameByClass($className, $withPrefix));
     }
 
     public function findById(string $className, $id) {

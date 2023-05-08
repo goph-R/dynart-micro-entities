@@ -43,7 +43,7 @@ abstract class QueryBuilder {
             }
         }
         $primaryKeyDef = $this->primaryKeyDefinition($className);
-        $safeTableName = $this->db->escapeName($this->entityManager->tableNameByClass($className));
+        $safeTableName = $this->entityManager->safeTableName($className);
         $result = "create table ";
         if ($ifNotExists) {
             $result .= "if not exists ";
@@ -60,7 +60,7 @@ abstract class QueryBuilder {
         return $result;
     }
 
-    protected function currentColumnForException() {
+    protected function currentColumn() {
         return $this->currentClassNameForException.'::'.$this->currentColumnNameForException;
     }
 

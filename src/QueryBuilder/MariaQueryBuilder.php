@@ -8,6 +8,18 @@ use Dynart\Micro\Entities\QueryBuilder;
 
 class MariaQueryBuilder extends QueryBuilder {
 
+    const SIMPLE_TYPE_MAP = [
+        EntityManager::TYPE_LONG     => 'bigint',
+        EntityManager::TYPE_INT      => 'int',
+        EntityManager::TYPE_FLOAT    => 'float',
+        EntityManager::TYPE_DOUBLE   => 'double',
+        EntityManager::TYPE_BOOL     => 'tinyint(1)',
+        EntityManager::TYPE_DATE     => 'date',
+        EntityManager::TYPE_TIME     => 'time',
+        EntityManager::TYPE_DATETIME => 'datetime',
+        EntityManager::TYPE_BLOB     => 'blob'
+    ];
+
     public function columnDefinition(string $columnName, array $columnData): string {
         $parts = [$this->db->escapeName($columnName)];
         $type = $columnData[EntityManager::COLUMN_TYPE];
@@ -48,16 +60,15 @@ class MariaQueryBuilder extends QueryBuilder {
     }
 
     public function foreignKeyDefinition(string $columnName, array $columnData): string {
-        $current = $this->currentColumnForException();
         $result = '';
         if (!array_key_exists(EntityManager::COLUMN_FOREIGN_KEY, $columnData)) {
             return $result;
         }
         if (!is_array($columnData[EntityManager::COLUMN_FOREIGN_KEY])) {
-            throw new EntityManagerException("$current: Foreign key definition must be an array: ".$columnName);
+            throw new EntityManagerException("Foreign key definition must be an array: ".$this->currentColumn());
         }
         if (count($columnData[EntityManager::COLUMN_FOREIGN_KEY]) != 2) {
-            throw new EntityManagerException("$current: Foreign key definition array size must be 2: ".$columnName);
+            throw new EntityManagerException("Foreign key definition array size must be 2: ".$this->currentColumn());
         }
         list($foreignClassName, $foreignColumnName) = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
         $result = 'foreign key '.$this->db->escapeName($columnName)
@@ -67,7 +78,7 @@ class MariaQueryBuilder extends QueryBuilder {
             $result .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_DELETE]);
         }
         if (array_key_exists(EntityManager::COLUMN_ON_UPDATE, $columnData)) {
-            $result .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_UPDATE]);
+            $result .= ' on update '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_UPDATE]);
         }
         return $result;
     }
@@ -80,55 +91,48 @@ class MariaQueryBuilder extends QueryBuilder {
         ";
     }
 
+    protected function checkIntSize($size) {
+        if ($size && !is_int($size)) {
+            throw new EntityManagerException("The size has to be an integer! ".$this->currentColumn());
+        }
+    }
+
+    protected function checkArraySize($size) {
+        if (!is_array($size) || count($size) != 2) {
+            throw new EntityManagerException("The size has to be an array with two element! ".$this->currentColumn());
+        }
+    }
+
     protected function sqlType(string $type, $size, bool $fixSize): string {
-        $current = $this->currentColumnForException();
         switch ($type) {
+            case EntityManager::TYPE_BOOL:
+            case EntityManager::TYPE_DATE:
+            case EntityManager::TYPE_TIME:
+            case EntityManager::TYPE_DATETIME:
+            case EntityManager::TYPE_BLOB:
+                return self::SIMPLE_TYPE_MAP[$type];
+
             case EntityManager::TYPE_LONG:
-                if ($size && !is_int($size)) {
-                    throw new EntityManagerException("$current: The size has to be an integer!");
-                }
-                return $size ? "bigint($size)" : 'bigint';
             case EntityManager::TYPE_INT:
-                if ($size && !is_int($size)) {
-                    throw new EntityManagerException("$current: The size has to be an integer!");
-                }
-                return $size ? "int($size)" : 'int';
             case EntityManager::TYPE_FLOAT:
-                if ($size && !is_int($size)) {
-                    throw new EntityManagerException("$current: The size has to be an integer!");
-                }
-                return $size ? "float($size)" : 'float';
             case EntityManager::TYPE_DOUBLE:
-                if ($size && !is_int($size)) {
-                    throw new EntityManagerException("$current: The size has to be an integer!");
-                }
-                return $size ? "double($size)" : 'double';
+                $this->checkIntSize($size);
+                $mappedType = self::SIMPLE_TYPE_MAP[$type];
+                return $size ? "$mappedType($size)" : $mappedType;
+
             case EntityManager::TYPE_NUMERIC:
-                if (!is_array($size) || count($size) != 2) {
-                    throw new EntityManagerException("$current: The size has to be an array with two element!");
-                }
+                $this->checkArraySize($size);
                 return "decimal($size[0], $size[1])";
+
             case EntityManager::TYPE_STRING:
-                if ($size) {
-                    if ($size && !is_int($size)) {
-                        throw new EntityManagerException("$current: The size has to be an integer!");
-                    }
-                    return $fixSize ? "char($size)" : "varchar($size)";
-                } else {
+                if (!$size) {
                     return 'longtext';
                 }
-            case EntityManager::TYPE_BOOL:
-                return 'tinyint(1)';
-            case EntityManager::TYPE_DATE:
-                return 'date';
-            case EntityManager::TYPE_TIME:
-                return 'time';
-            case EntityManager::TYPE_DATETIME:
-                return 'datetime';
-            case EntityManager::TYPE_BLOB:
-                return 'blob';
+                $this->checkIntSize($size);
+                return $fixSize ? "char($size)" : "varchar($size)";
+
             default:
-                throw new EntityManagerException("$current: Unknown type '$type'");
+                throw new EntityManagerException("Unknown type '$type': ".$this->currentColumn());
         }
     }
 
@@ -139,8 +143,7 @@ class MariaQueryBuilder extends QueryBuilder {
             case EntityManager::ACTION_SET_NULL:
                 return 'set null';
             default:
-                $current = $this->currentColumnForException();
-                throw new EntityManagerException("$current: Unknown action '$action'");
+                throw new EntityManagerException("Unknown action '$action': : ".$this->currentColumn());
         }
     }
 
@@ -148,8 +151,7 @@ class MariaQueryBuilder extends QueryBuilder {
         $isLongText = $type == EntityManager::TYPE_STRING && !$size;
         $isBlob = $type == EntityManager::TYPE_BLOB;
         if ($isLongText || $isBlob) {
-            $current = $this->currentColumnForException();
-            throw new EntityManagerException("$current: Text and blob types can't have a default value");
+            throw new EntityManagerException("Text and blob types can't have a default value: ".$this->currentColumn());
         }
         $isDate = in_array($type, [EntityManager::TYPE_DATE, EntityManager::TYPE_TIME, EntityManager::TYPE_DATETIME]);
         if ($value === null) {

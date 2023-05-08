@@ -23,8 +23,8 @@ class QueryExecutor {
 
     public function isTableExists(string $className): bool {
         $result = $this->db->fetchOne($this->queryBuilder->isTableExist($className, ':dbName', ':tableName'), [
-            ':dbName'    => $this->db->configValue('name'),
-            ':tableName' => $this->entityManager->tableNameByClass($className)
+            ':dbName'       => $this->db->configValue('name'),
+            ':tableName'    => $this->entityManager->tableNameByClass($className)
         ]);
         return $result ? true : false;
     }

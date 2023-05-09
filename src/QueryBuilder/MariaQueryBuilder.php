@@ -71,7 +71,7 @@ class MariaQueryBuilder extends QueryBuilder {
             throw new EntityManagerException("Foreign key definition array size must be 2: ".$this->currentColumn());
         }
         list($foreignClassName, $foreignColumnName) = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
-        $result = 'foreign key '.$this->db->escapeName($columnName)
+        $result = 'foreign key ('.$this->db->escapeName($columnName).')'
             .' references '.$this->entityManager->safeTableName($foreignClassName)
             .' ('.$this->db->escapeName($foreignColumnName).')';
         if (array_key_exists(EntityManager::COLUMN_ON_DELETE, $columnData)) {
@@ -91,14 +91,18 @@ class MariaQueryBuilder extends QueryBuilder {
         ";
     }
 
+    public function listTables(): string {
+        return "show tables";
+    }
+
     protected function checkIntSize($size) {
         if ($size && !is_int($size)) {
             throw new EntityManagerException("The size has to be an integer! ".$this->currentColumn());
         }
     }
 
-    protected function checkArraySize($size) {
-        if (!is_array($size) || count($size) != 2) {
+    protected function checkArraySize($size, $count) {
+        if (!is_array($size) || count($size) != $count) {
             throw new EntityManagerException("The size has to be an array with two element! ".$this->currentColumn());
         }
     }
@@ -121,7 +125,7 @@ class MariaQueryBuilder extends QueryBuilder {
                 return $size ? "$mappedType($size)" : $mappedType;
 
             case EntityManager::TYPE_NUMERIC:
-                $this->checkArraySize($size);
+                $this->checkArraySize($size, 2);
                 return "decimal($size[0], $size[1])";
 
             case EntityManager::TYPE_STRING:
@@ -148,17 +152,21 @@ class MariaQueryBuilder extends QueryBuilder {
     }
 
     protected function sqlDefaultValue($value, string $type, int $size): string {
-        $isLongText = $type == EntityManager::TYPE_STRING && !$size;
-        $isBlob = $type == EntityManager::TYPE_BLOB;
-        if ($isLongText || $isBlob) {
+        if ($type == EntityManager::TYPE_BLOB || ($type == EntityManager::TYPE_STRING && !$size)) {
             throw new EntityManagerException("Text and blob types can't have a default value: ".$this->currentColumn());
         }
-        $isDate = in_array($type, [EntityManager::TYPE_DATE, EntityManager::TYPE_TIME, EntityManager::TYPE_DATETIME]);
         if ($value === null) {
             return 'null';
         } else if ($type == EntityManager::TYPE_STRING) {
-            return "'".str_replace("'", "\\'", $value)."'";
-        } else if ($isDate && $value == EntityManager::DEFAULT_NOW) {
+            if (is_array($value)) {
+                if (empty($value)) {
+                    throw new EntityManagerException("String default value is raw (array), but empty: ".$this->currentColumn());
+                }
+                return $value[0];
+            } else {
+                return "'".str_replace("'", "\\'", $value)."'";
+            }
+        } else if ($this->isDateType($type) && $value == EntityManager::DEFAULT_NOW) {
             switch ($type) {
                 case EntityManager::TYPE_DATETIME:
                     return 'utc_timestamp()';
@@ -167,9 +175,13 @@ class MariaQueryBuilder extends QueryBuilder {
                 case EntityManager::TYPE_TIME:
                     return 'utc_time()';
             }
-        } else if ($type == EntityManager::TYPE_BOOL) {
+        } else if ($type == EntityManager::TYPE_BOOL && is_bool($value)) {
             return $value ? '1' : '0';
         }
         return $value;
+    }
+
+    protected function isDateType(string $type): bool {
+        return in_array($type, [EntityManager::TYPE_DATE, EntityManager::TYPE_TIME, EntityManager::TYPE_DATETIME]);
     }
 }

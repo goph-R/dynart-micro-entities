@@ -24,6 +24,7 @@ abstract class QueryBuilder {
     abstract public function primaryKeyDefinition(string $className): string;
     abstract public function foreignKeyDefinition(string $columnName, array $columnData): string;
     abstract public function isTableExist(string $className, string $dbNameParam, string $tableNameParam): string;
+    abstract public function listTables(): string;
 
     public function __construct(Database $db, EntityManager $entityManager) {
         $this->db = $db;
@@ -63,7 +64,6 @@ abstract class QueryBuilder {
     protected function currentColumn() {
         return $this->currentClassNameForException.'::'.$this->currentColumnNameForException;
     }
-
 
 /*
     tableData format:

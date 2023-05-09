@@ -33,4 +33,8 @@ class QueryExecutor {
         $this->db->query($this->queryBuilder->createTable($className, $ifNotExists));
     }
 
+    public function listTables(): array {
+        return $this->db->fetchColumn($this->queryBuilder->listTables());
+    }
+
 }

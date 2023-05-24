@@ -83,16 +83,21 @@ class MariaQueryBuilder extends QueryBuilder {
         return $result;
     }
 
-    public function isTableExist(string $className, string $dbNameParam, string $tableNameParam): string {
-        return "
-            select 1 from information_schema.tables
-            where table_schema = $dbNameParam and table_name = $tableNameParam
-            limit 1
-        ";
+    public function isTableExist(string $dbNameParam, string $tableNameParam): string {
+        return "select 1 from information_schema.tables where table_schema = $dbNameParam and table_name = $tableNameParam limit 1";
     }
 
     public function listTables(): string {
         return "show tables";
+    }
+
+    public function describeTable(string $className): string {
+        return "describe ".$this->entityManager->tableNameByClass($className);
+    }
+
+    public function columnsByTableDescription(array $data): array {
+        print_r($data);
+        return [];
     }
 
     protected function checkIntSize($size) {

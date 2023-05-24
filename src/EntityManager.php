@@ -58,6 +58,10 @@ class EntityManager {
         $this->tableNamePrefix = $db->configValue('table_prefix');
     }
 
+    public function setTableNamePrefix(string $prefix) {
+        $this->tableNamePrefix = $prefix;
+    }
+
     public function addColumn(string $className, string $columnName, array $columnData) {
         if (!array_key_exists($className, $this->tableNames)) {
             $this->tableNames[$className] = $this->tableNameByClass($className);
@@ -209,5 +213,9 @@ class EntityManager {
         $result = $this->db->fetch($sql, $params, $className);
         $result->setNew(false);
         return $result;
+    }
+
+    public function allTableColumns() {
+        return $this->tableColumns;
     }
 }

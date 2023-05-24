@@ -23,8 +23,10 @@ abstract class QueryBuilder {
     abstract public function columnDefinition(string $columnName, array $columnData): string;
     abstract public function primaryKeyDefinition(string $className): string;
     abstract public function foreignKeyDefinition(string $columnName, array $columnData): string;
-    abstract public function isTableExist(string $className, string $dbNameParam, string $tableNameParam): string;
+    abstract public function isTableExist(string $dbNameParam, string $tableNameParam): string;
     abstract public function listTables(): string;
+    abstract public function describeTable(string $className): string;
+    abstract public function columnsByTableDescription(array $data): array;
 
     public function __construct(Database $db, EntityManager $entityManager) {
         $this->db = $db;
@@ -95,7 +97,6 @@ abstract class QueryBuilder {
         index(!columnName)
 
     listTables() "show tables"
-    dropTable($tableName) "drop table !tableName"
 
     addColumn($tableName, $columnName, $columnData) "alter table !tableName add column !columnDefinition"
     changeColumn($tableName, $columnName, $columnData) "alter table !tableName change column !columnDefinition"

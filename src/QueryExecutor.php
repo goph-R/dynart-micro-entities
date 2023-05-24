@@ -22,9 +22,9 @@ class QueryExecutor {
     }
 
     public function isTableExists(string $className): bool {
-        $result = $this->db->fetchOne($this->queryBuilder->isTableExist($className, ':dbName', ':tableName'), [
-            ':dbName'       => $this->db->configValue('name'),
-            ':tableName'    => $this->entityManager->tableNameByClass($className)
+        $result = $this->db->fetchOne($this->queryBuilder->isTableExist(':dbName', ':tableName'), [
+            ':dbName'    => $this->db->configValue('name'),
+            ':tableName' => $this->entityManager->tableNameByClass($className)
         ]);
         return $result ? true : false;
     }
@@ -37,4 +37,9 @@ class QueryExecutor {
         return $this->db->fetchColumn($this->queryBuilder->listTables());
     }
 
+    public function findColumns(string $className): array {
+        return $this->queryBuilder->columnsByTableDescription(
+            $this->db->fetchAll($this->queryBuilder->describeTable($className))
+        );
+    }
 }

@@ -1,8 +1,10 @@
 <?php
 
-namespace Dynart\Micro;
+namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Database\PdoBuilder;
+use Dynart\Micro\Config;
+use Dynart\Micro\Entities\Database\PdoBuilder;
+use Dynart\Micro\Logger;
 
 abstract class Database
 {

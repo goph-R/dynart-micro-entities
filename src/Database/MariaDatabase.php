@@ -2,7 +2,7 @@
 
 namespace Dynart\Micro\Database;
 
-use Dynart\Micro\Database;
+use Dynart\Micro\Entities\Database;
 
 class MariaDatabase extends Database {
 

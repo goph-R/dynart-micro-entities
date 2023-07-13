@@ -3,7 +3,6 @@
 namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Config;
-use Dynart\Micro\Database;
 
 class EntityManager {
 

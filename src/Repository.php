@@ -2,8 +2,6 @@
 
 namespace Dynart\Micro\Entities;
 
-use \Dynart\Micro\Database;
-
 // TODO: rethink
 
 abstract class Repository {

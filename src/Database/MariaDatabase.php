@@ -1,6 +1,6 @@
 <?php
 
-namespace Dynart\Micro\Entites\Database;
+namespace Dynart\Micro\Entities\Database;
 
 use Dynart\Micro\Entities\Database;
 

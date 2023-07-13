@@ -2,8 +2,6 @@
 
 namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Database;
-
 class QueryExecutor {
 
     /** @var QueryBuilder */

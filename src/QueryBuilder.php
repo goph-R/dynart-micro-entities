@@ -2,8 +2,6 @@
 
 namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Database;
-
 abstract class QueryBuilder {
 
     const INDENTATION = '  ';

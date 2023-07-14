@@ -3,7 +3,6 @@
 namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Config;
-use Dynart\Micro\Entities\Database\PdoBuilder;
 use Dynart\Micro\Logger;
 
 abstract class Database
@@ -27,7 +26,7 @@ abstract class Database
     abstract public function escapeName(string $name): string;
     abstract public function namedPlaceholderRegex(string $name): string;
 
-    public function __construct(Config $config, Logger $logger, Database\PdoBuilder $pdoBuilder) {
+    public function __construct(Config $config, Logger $logger, PdoBuilder $pdoBuilder) {
         $this->config = $config;
         $this->logger = $logger;
         $this->pdoBuilder = $pdoBuilder;

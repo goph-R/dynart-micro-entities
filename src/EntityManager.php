@@ -161,6 +161,45 @@ class EntityManager {
         return $this->isColumn($pkColumn, self::COLUMN_AUTO_INCREMENT);
     }
 
+
+    public function safeTableName(string $className, bool $withPrefix = true): string {
+        return $this->db->escapeName($this->tableNameByClass($className, $withPrefix));
+    }
+
+    public function allTableColumns() {
+        return $this->tableColumns;
+    }
+
+    public function insert(string $className, array $data) {
+        $this->db->insert($this->tableName($className), $data);
+        return $this->db->lastInsertId();
+    }
+
+    public function update(string $className, array $data, string $condition='', array $conditionParams=[]) {
+        $this->db->update($this->tableName($className), $data, $condition, $conditionParams);
+    }
+
+    public function findById(string $className, $id) {
+        $condition = $this->primaryKeyCondition($className);
+        $safeTableName = $this->safeTableName($className);
+        $sql = "select * from $safeTableName where $condition";
+        $params = $this->primaryKeyConditionParams($className, $id); // array_merge?
+        $result = $this->db->fetch($sql, $params, $className);
+        $result->setNew(false);
+        return $result;
+    }
+
+    public function deleteById(string $className, int $id) {
+        $sql = "delete from {$this->safeTableName($className)} where id = :id limit 1";
+        $this->db->query($sql, [':id' => $id]);
+    }
+
+    public function deleteByIds(string $className, array $ids) {
+        list($condition, $params) = $this->db->getInConditionAndParams($ids);
+        $sql = "delete from {$this->safeTableName($className)} where id in ($condition)";
+        $this->db->query($sql, $params);
+    }
+
     public function save(Entity $entity) {
         $className = get_class($entity);
         $tableName = $this->tableName($className);
@@ -200,21 +239,4 @@ class EntityManager {
         return $data;
     }
 
-    public function safeTableName(string $className, bool $withPrefix = true): string {
-        return $this->db->escapeName($this->tableNameByClass($className, $withPrefix));
-    }
-
-    public function findById(string $className, $id) {
-        $conditions = $this->primaryKeyCondition($className);
-        $safeTableName = $this->safeTableName($className);
-        $sql = "select * from $safeTableName where $conditions";
-        $params = array_merge($this->primaryKeyConditionParams($className, $id));
-        $result = $this->db->fetch($sql, $params, $className);
-        $result->setNew(false);
-        return $result;
-    }
-
-    public function allTableColumns() {
-        return $this->tableColumns;
-    }
 }

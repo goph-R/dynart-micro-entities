@@ -1,6 +1,6 @@
 <?php
 
-namespace Dynart\Micro\Entities\Database;
+namespace Dynart\Micro\Entities;
 
 class PdoBuilder {
 

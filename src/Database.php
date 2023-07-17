@@ -24,6 +24,7 @@ abstract class Database
 
     abstract protected function connect(): void;
     abstract public function escapeName(string $name): string;
+    abstract public function escapeLike(string $string): string;
     abstract public function namedPlaceholderRegex(string $name): string;
 
     public function __construct(Config $config, Logger $logger, PdoBuilder $pdoBuilder) {

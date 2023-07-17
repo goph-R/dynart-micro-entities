@@ -27,7 +27,15 @@ class MariaDatabase extends Database {
         return '`'.join('`.`', $parts).'`';
     }
 
+    public function escapeLike(string $string): string {
+        return str_replace('%', '\\%', $string);
+    }
+
     public function namedPlaceholderRegex(string $name): string {
+        return '/(?<!["\'])\\'.$name.'/';
+    }
+
+    public function entityRegex(string $name): string {
         return '/(?<!["\'])\\'.$name.'/';
     }
 

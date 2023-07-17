@@ -4,55 +4,73 @@ namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Config;
 
-abstract class Query {
+class Query {
 
     const CONFIG_MAX_PAGE_SIZE = 'entities.query.max_page_size';
-    const DEFAULT_MAX_PAGE_SIZE = 100;
+    const DEFAULT_MAX_PAGE_SIZE = 1000;
 
     /** @var Database */
     protected $db;
 
+    /** @var EntityManager */
+    protected $entityManager;
+
+    protected $className = '';
     protected $maxPageSize;
 
-    protected $sqlParams = [];
-    protected $orderByFields = [];
+    protected $variables = [];
 
     protected $fields = [];
+    protected $orderByFields = [];
     protected $joins = [];
     protected $conditions = [];
 
-    public function __construct(Config $config, Database $db) {
-        $this->maxPageSize = $config->get(self::CONFIG_MAX_PAGE_SIZE, self::DEFAULT_MAX_PAGE_SIZE);
+    public function __construct(Config $config, Database $db, EntityManager $entityManager, string $className) {
         $this->db = $db;
+        $this->entityManager = $entityManager;
+        $this->className = $className;
+        $this->maxPageSize = $config->get(self::CONFIG_MAX_PAGE_SIZE, self::DEFAULT_MAX_PAGE_SIZE);
     }
 
-    public function addField(string $name, string $as = '') {
-        if ($as) {
-            $this->fields[$as] = $name;
-        } else {
-            $this->fields[] = $name;
-        }
+    public function addFields(array $fields) {
+        $this->fields = array_merge($this->fields, $fields);
+    }
+
+    public function setFields(array $fields) {
+        $this->fields = $fields;
+    }
+
+    public function addVariables(array $variables) {
+        $this->variables = array_merge($this->variables, $variables);
+    }
+
+    public function addConditions(array $conditions, array $variables = []) {
+        $this->conditions = array_merge($this->conditions, $conditions);
+        $this->addVariables($variables);
+    }
+
+    public function addJoin(string $className, array $conditions, array $variables) {
+
     }
 
     public function findAll(array $params = []) {
-        $sql = $this->getSelect($params);
-        $sql .= $this->getWhere($params);
-        $sql .= $this->getOrder($params);
-        $sql .= $this->getLimit($params);
-        return $this->db->fetchAll($sql, $this->sqlParams);
+        $sql = $this->select($this->fields, $params);
+        $sql .= $this->where($params);
+        $sql .= $this->order($params);
+        $sql .= $this->limit($params);
+        return $this->db->fetchAll($sql, $this->variables);
     }
 
     public function findAllCount(array $params = []) {
-        $fields = ['c' => ['count(1)']];
-        $sql = $this->getSelect($fields, $params);
-        $sql .= $this->getWhere($params);
-        return $this->db->fetchOne($sql, $this->sqlParams);
+        $sql = $this->select(['c' => ['count(1)']], $params);
+        $sql .= $this->where($params);
+        return $this->db->fetchOne($sql, $this->variables);
     }
 
-    protected function getSelect(array $params) {
+    protected function select(array $fields, array $params) {
         $select = [];
         $this->orderByFields = [];
-        foreach ($this->fields as $as => $name) {
+        foreach ($fields as $as => $name) {
             $safeName = is_array($name) ? $name[0] : $this->db->escapeName($name);
             if (is_int($as)) {
                 $this->orderByFields[] = $name;
@@ -62,20 +80,23 @@ abstract class Query {
                 $select[] = $safeName.' as '.$this->db->escapeName($as);
             }
         }
-        $sql = 'select '.join(', ', $select).' from '.$this->safeTableName();
-        $sql .= $this->getJoins($params);
+        $sql = 'select '.join(', ', $select).' from '.$this->entityManager->safeTableName($this->className);
+        $sql .= $this->joins($params);
         return $sql;
     }
 
-    protected function getJoins(array $params) {
+    protected function joins() {
         return '';
     }
 
-    protected function getWhere(array $params) {
+    protected function where() {
+        if (empty($this->conditions)) {
+            return '';
+        }
         return '';
     }
 
-    protected function getOrder(array $params) {
+    protected function order(array $params) {
         if (!isset($params['order_by']) || !isset($params['order_dir'])) {
             return '';
         }
@@ -93,9 +114,15 @@ abstract class Query {
         }
         $page = (int)$params['page'];
         $pageSize = (int)$params['page_size'];
-        if ($page < 0) $page = 0;
-        if ($pageSize < 1) $pageSize = 1;
-        if ($pageSize > 100) $pageSize = $this->maxPageSize;
+        if ($page < 0) {
+            $page = 0;
+        }
+        if ($pageSize < 1) {
+            $pageSize = 1;
+        }
+        if ($pageSize > $this->maxPageSize) {
+            $pageSize = $this->maxPageSize;
+        }
         return ' limit '.($page * $pageSize).', '.$pageSize;
     }
 }

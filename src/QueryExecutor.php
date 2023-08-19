@@ -50,6 +50,10 @@ class QueryExecutor {
         return $this->db->fetchAll($this->qb->findAll($query, $fields), $query->variables());
     }
 
+    public function findAllColumn(Query $query, string $column = '') {
+        return $this->db->fetchColumn($this->qb->findAll($query, $column ? [$column] : []), $query->variables());
+    }
+
     public function findAllCount(Query $query) {
         return $this->db->fetchOne($this->qb->findAllCount($query), $query->variables());
     }

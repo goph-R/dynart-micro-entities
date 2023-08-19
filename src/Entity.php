@@ -2,7 +2,15 @@
 
 namespace Dynart\Micro\Entities;
 
-class Entity {
+/**
+ * An abstract class for entities
+ *
+ * @package Dynart\Micro\Entities
+ */
+abstract class Entity {
+
+    const EVENT_BEFORE_SAVE = 'before_save';
+    const EVENT_AFTER_SAVE = 'after_save';
 
     private $__isNew = true;
 
@@ -12,5 +20,13 @@ class Entity {
 
     public function setNew(bool $value) {
         $this->__isNew = $value;
+    }
+
+    public function beforeSaveEvent(): string {
+        return get_class($this).':'.self::EVENT_BEFORE_SAVE;
+    }
+
+    public function afterSaveEvent(): string {
+        return get_class($this).':'.self::EVENT_AFTER_SAVE;
     }
 }

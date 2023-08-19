@@ -3,7 +3,16 @@
 namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Config;
+use Dynart\Micro\EventService;
 
+/**
+ * Manages entities
+ *
+ * - Stores meta information of the tables by class names
+ * - Creates, reads, saves and deletes the entities
+ *
+ * @package Dynart\Micro\Entities
+ */
 class EntityManager {
 
     const COLUMN_TYPE = 'type';
@@ -40,6 +49,9 @@ class EntityManager {
     /** @var Database */
     protected $db;
 
+    /** @var EventService */
+    protected $events;
+
     /** @var array */
     protected $tableColumns = [];
 
@@ -51,9 +63,10 @@ class EntityManager {
 
     protected $tableNamePrefix = '';
 
-    public function __construct(Config $config, Database $db) {
+    public function __construct(Config $config, Database $db, EventService $events) {
         $this->config = $config;
         $this->db = $db;
+        $this->events = $events;
         $this->tableNamePrefix = $db->configValue('table_prefix');
     }
 
@@ -201,6 +214,7 @@ class EntityManager {
     }
 
     public function save(Entity $entity) {
+        $this->events->emit($entity->beforeSaveEvent(), [$entity]);
         $className = get_class($entity);
         $tableName = $this->tableName($className);
         $data = $this->fetchDataArray($entity);
@@ -217,6 +231,7 @@ class EntityManager {
                 $this->primaryKeyConditionParams($className, $this->primaryKeyValue($className, $data))
             );
         }
+        $this->events->emit($entity->afterSaveEvent(), [$entity]);
     }
 
     public function setByDataArray(Entity $entity, array $data) {
@@ -238,5 +253,4 @@ class EntityManager {
         }
         return $data;
     }
-
 }

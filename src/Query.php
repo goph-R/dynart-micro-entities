@@ -2,127 +2,118 @@
 
 namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Config;
+use Dynart\Micro\Micro;
 
+/**
+ * Represents an SQL SELECT query
+ *
+ * @package Dynart\Micro\Entities
+ */
 class Query {
 
-    const CONFIG_MAX_PAGE_SIZE = 'entities.query.max_page_size';
-    const DEFAULT_MAX_PAGE_SIZE = 1000;
+    const INNER_JOIN = 'inner';
+    const LEFT_JOIN = 'left';
+    const RIGHT_JOIN = 'right';
+    const OUTER_JOIN = 'full outer';
 
-    /** @var Database */
-    protected $db;
-
-    /** @var EntityManager */
-    protected $entityManager;
-
-    protected $className = '';
-    protected $maxPageSize;
-
+    protected $from = '';
     protected $variables = [];
-
     protected $fields = [];
-    protected $orderByFields = [];
     protected $joins = [];
     protected $conditions = [];
+    protected $groups = [];
+    protected $orders = [];
+    protected $page = -1;
+    protected $pageSize = -1;
 
-    public function __construct(Config $config, Database $db, EntityManager $entityManager, string $className) {
-        $this->db = $db;
-        $this->entityManager = $entityManager;
-        $this->className = $className;
-        $this->maxPageSize = $config->get(self::CONFIG_MAX_PAGE_SIZE, self::DEFAULT_MAX_PAGE_SIZE);
+    /**
+     * Query constructor.
+     * @param string|Query $from The source of the query (Entity::class or a Query instance)
+     */
+    public function __construct($from) {
+        $this->from = $from;
     }
 
-    public function addFields(array $fields) {
+    public function from() {
+        return $this->from;
+    }
+
+    public function addFields(array $fields): void {
         $this->fields = array_merge($this->fields, $fields);
     }
 
-    public function setFields(array $fields) {
+    public function setFields(array $fields): void {
         $this->fields = $fields;
     }
 
-    public function addVariables(array $variables) {
+    public function fields(): array {
+        return $this->shouldSelectAllFields() ? $this->allFields() : $this->fields;
+    }
+
+    public function addVariables(array $variables): void {
         $this->variables = array_merge($this->variables, $variables);
     }
 
-    public function addConditions(array $conditions, array $variables = []) {
-        $this->conditions = array_merge($this->conditions, $conditions);
+    public function variables(): array {
+        return $this->variables;
+    }
+
+    public function addCondition(string $condition, array $variables = []): void {
+        $this->conditions[] = $condition;
         $this->addVariables($variables);
     }
 
-    public function addJoin(string $className, array $conditions, array $variables) {
-
+    public function conditions(): array {
+        return $this->conditions;
     }
 
-    public function findAll(array $params = []) {
-        $sql = $this->select($this->fields, $params);
-        $sql .= $this->where($params);
-        $sql .= $this->order($params);
-        $sql .= $this->limit($params);
-        return $this->db->fetchAll($sql, $this->variables);
+    public function addInnerJoin($from, string $condition, array $variables = []): void {
+        $this->addJoin(self::INNER_JOIN, $from, $condition, $variables);
     }
 
-    public function findAllCount(array $params = []) {
-        $sql = $this->select(['c' => ['count(1)']], $params);
-        $sql .= $this->where($params);
-        return $this->db->fetchOne($sql, $this->variables);
+    public function addJoin(string $type, $from, string $condition, array $variables = []): void {
+        $this->joins[] = [$type, $from, $condition];
+        $this->addVariables($variables);
     }
 
-    protected function select(array $fields, array $params) {
-        $select = [];
-        $this->orderByFields = [];
-        foreach ($fields as $as => $name) {
-            $safeName = is_array($name) ? $name[0] : $this->db->escapeName($name);
-            if (is_int($as)) {
-                $this->orderByFields[] = $name;
-                $select[] = $safeName;
-            } else {
-                $this->orderByFields[] = $as;
-                $select[] = $safeName.' as '.$this->db->escapeName($as);
-            }
-        }
-        $sql = 'select '.join(', ', $select).' from '.$this->entityManager->safeTableName($this->className);
-        $sql .= $this->joins($params);
-        return $sql;
+    public function joins() {
+        return $this->joins;
     }
 
-    protected function joins() {
-        return '';
+    public function addGroupBy(string $name): void {
+        $this->groups[] = $name;
     }
 
-    protected function where() {
-        if (empty($this->conditions)) {
-            return '';
-        }
-        return '';
+    public function groupBy(): array {
+        return $this->groups;
     }
 
-    protected function order(array $params) {
-        if (!isset($params['order_by']) || !isset($params['order_dir'])) {
-            return '';
-        }
-        $orderBy = $params['order_by'];
-        if (!in_array($orderBy, $this->orderByFields)) {
-            return '';
-        }
-        $orderDir = $params['order_dir'] == 'desc' ? 'desc' : 'asc';
-        return ' order by '.$this->db->escapeName($orderBy).' '.$orderDir;
+    public function addOrderBy(string $name, string $dir = 'asc'): void {
+        $this->orders[] = [$name, $dir];
     }
 
-    protected function getLimit(array $params) {
-        if (!isset($params['page']) || !isset($params['page_size'])) {
-            return '';
-        }
-        $page = (int)$params['page'];
-        $pageSize = (int)$params['page_size'];
-        if ($page < 0) {
-            $page = 0;
-        }
-        if ($pageSize < 1) {
-            $pageSize = 1;
-        }
-        if ($pageSize > $this->maxPageSize) {
-            $pageSize = $this->maxPageSize;
-        }
-        return ' limit '.($page * $pageSize).', '.$pageSize;
+    public function orderBy(): array {
+        return $this->orders;
+    }
+
+    public function setLimit(int $page, int $pageSize): void {
+        $this->page = $page;
+        $this->pageSize = $pageSize;
+    }
+
+    public function page(): int {
+        return $this->page;
+    }
+
+    public function pageSize(): int {
+        return $this->pageSize;
+    }
+
+    private function shouldSelectAllFields(): bool {
+        return empty($this->fields) && is_string($this->from);
+    }
+
+    private function allFields(): array {
+        return array_keys(Micro::get(EntityManager::class)->tableColumns($this->from));
     }
 }

@@ -3,7 +3,7 @@
 namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Annotation;
-use Dynart\Micro\AppException;
+use Dynart\Micro\MicroException;
 
 class ColumnAnnotation implements Annotation {
 
@@ -30,7 +30,7 @@ class ColumnAnnotation implements Annotation {
         if ($matches) {
             $this->entityManager->addColumn($className, $subject->getName(), json_decode($matches[1], true));
         } else {
-            throw new AppException("Invalid column annotation in comment: $comment");
+            throw new MicroException("Invalid column annotation in comment: $comment");
         }
     }
 }

@@ -24,12 +24,12 @@ class MariaQueryBuilder extends QueryBuilder {
         $parts = [$this->db->escapeName($columnName)];
         $type = $columnData[EntityManager::COLUMN_TYPE];
         $size = array_key_exists(EntityManager::COLUMN_SIZE, $columnData) ? $columnData[EntityManager::COLUMN_SIZE] : 0;
-        $fixSize = $this->entityManager->isColumn($columnData, EntityManager::COLUMN_FIX_SIZE);
+        $fixSize = $this->em->isColumn($columnData, EntityManager::COLUMN_FIX_SIZE);
         $parts[] = $this->sqlType($type, $size, $fixSize);
-        if ($this->entityManager->isColumn($columnData, EntityManager::COLUMN_NOT_NULL)) {
+        if ($this->em->isColumn($columnData, EntityManager::COLUMN_NOT_NULL)) {
             $parts[] = 'not null';
         }
-        if ($this->entityManager->isColumn($columnData, EntityManager::COLUMN_AUTO_INCREMENT)) {
+        if ($this->em->isColumn($columnData, EntityManager::COLUMN_AUTO_INCREMENT)) {
             $parts[] = 'auto_increment';
         }
         if (array_key_exists(EntityManager::COLUMN_DEFAULT, $columnData)) {
@@ -41,7 +41,7 @@ class MariaQueryBuilder extends QueryBuilder {
 
     public function primaryKeyDefinition(string $className): string {
         $result = '';
-        $primaryKey = $this->entityManager->primaryKey($className);
+        $primaryKey = $this->em->primaryKey($className);
         if (!$primaryKey) {
             return $result;
         }
@@ -72,7 +72,7 @@ class MariaQueryBuilder extends QueryBuilder {
         }
         list($foreignClassName, $foreignColumnName) = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
         $result = 'foreign key ('.$this->db->escapeName($columnName).')'
-            .' references '.$this->entityManager->safeTableName($foreignClassName)
+            .' references '.$this->em->safeTableName($foreignClassName)
             .' ('.$this->db->escapeName($foreignColumnName).')';
         if (array_key_exists(EntityManager::COLUMN_ON_DELETE, $columnData)) {
             $result .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_DELETE]);
@@ -92,7 +92,7 @@ class MariaQueryBuilder extends QueryBuilder {
     }
 
     public function describeTable(string $className): string {
-        return "describe ".$this->entityManager->tableNameByClass($className);
+        return "describe ".$this->em->tableNameByClass($className);
     }
 
     public function columnsByTableDescription(array $data): array {

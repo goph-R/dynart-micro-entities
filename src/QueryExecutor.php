@@ -32,29 +32,34 @@ class QueryExecutor {
         return $result ? true : false;
     }
 
-    public function createTable(string $className, bool $ifNotExists = false) {
-        $this->db->query($this->queryBuilder->createTable($className, $ifNotExists));
+    public function createTable(string $className, bool $ifNotExists = false): void {
+        $sql = $this->queryBuilder->createTable($className, $ifNotExists);
+        $this->db->query($sql);
     }
 
     public function listTables(): array {
-        return $this->db->fetchColumn($this->queryBuilder->listTables());
+        $sql = $this->queryBuilder->listTables();
+        return $this->db->fetchColumn($sql);
     }
 
     public function findColumns(string $className): array {
-        return $this->queryBuilder->columnsByTableDescription(
-            $this->db->fetchAll($this->queryBuilder->describeTable($className))
-        );
+        $sql = $this->queryBuilder->describeTable($className);
+        return $this->queryBuilder->columnsByTableDescription($this->db->fetchAll($sql));
     }
 
     public function findAll(Query $query, array $fields = []) {
-        return $this->db->fetchAll($this->queryBuilder->findAll($query, $fields), $query->variables());
+        $sql = $this->queryBuilder->findAll($query, $fields);
+        return $this->db->fetchAll($sql, $query->variables());
     }
 
     public function findAllColumn(Query $query, string $column = '') {
-        return $this->db->fetchColumn($this->queryBuilder->findAll($query, $column ? [$column] : []), $query->variables());
+        $fields = $column ? [$column] : [];
+        $sql = $this->queryBuilder->findAll($query, $fields);
+        return $this->db->fetchColumn($sql, $query->variables());
     }
 
     public function findAllCount(Query $query) {
-        return $this->db->fetchOne($this->queryBuilder->findAllCount($query), $query->variables());
+        $sql = $this->queryBuilder->findAllCount($query);
+        return $this->db->fetchOne($sql, $query->variables());
     }
 }

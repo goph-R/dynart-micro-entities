@@ -108,7 +108,7 @@ class MariaQueryBuilder extends QueryBuilder {
 
     protected function checkArraySize($size, $count) {
         if (!is_array($size) || count($size) != $count) {
-            throw new EntityManagerException("The size has to be an array with two element! ".$this->currentColumn());
+            throw new EntityManagerException("The size array has to have $count elements! ".$this->currentColumn());
         }
     }
 
@@ -162,15 +162,13 @@ class MariaQueryBuilder extends QueryBuilder {
         }
         if ($value === null) {
             return 'null';
-        } else if ($type == EntityManager::TYPE_STRING) {
-            if (is_array($value)) {
-                if (empty($value)) {
-                    throw new EntityManagerException("String default value is raw (array), but empty: ".$this->currentColumn());
-                }
-                return $value[0];
-            } else {
-                return "'".str_replace("'", "\\'", $value)."'";
+        } else if (is_array($value)) {
+            if (count($value) != 1) {
+                throw new EntityManagerException("Raw default value (array) only can have one element: ".$this->currentColumn());
             }
+            return $value[0];
+        } else if ($type == EntityManager::TYPE_STRING) {
+            return "'".str_replace("'", "\\'", $value)."'";
         } else if ($this->isDateType($type) && $value == EntityManager::DEFAULT_NOW) {
             switch ($type) {
                 case EntityManager::TYPE_DATETIME:

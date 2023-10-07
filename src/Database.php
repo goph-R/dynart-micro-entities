@@ -25,7 +25,6 @@ abstract class Database
     abstract protected function connect(): void;
     abstract public function escapeName(string $name): string;
     abstract public function escapeLike(string $string): string;
-    abstract public function namedPlaceholderRegex(string $name): string;
 
     public function __construct(Config $config, Logger $logger, PdoBuilder $pdoBuilder) {
         $this->config = $config;
@@ -44,7 +43,7 @@ abstract class Database
     public function query(string $query, array $params = [], bool $closeCursor = false) {
         try {
             $this->connect();
-            list($query, $params) = $this->replaceNamedPlaceholders($query, $params);
+            $query = $this->replaceClassHashNamesWithTableNames($query);
             $stmt = $this->pdo->prepare($query);
             $stmt->execute($params);
             if ($this->logger->level() == Logger::DEBUG) { // because of the json_encode
@@ -60,19 +59,18 @@ abstract class Database
         return $stmt;
     }
 
-    /**
-     * @param string $query
-     * @param array $params
-     * @return array
-     */
-    protected function replaceNamedPlaceholders(string $query, array $params): array {
-        foreach ($params as $n => $v) {
-            if ($n[0] == '!') {
-                $query = preg_replace($this->namedPlaceholderRegex($n), $v, $query);
-                unset($params[$n]);
-            }
-        }
-        return array($query, $params);
+    protected function replaceClassHashNamesWithTableNames(string $query) {
+        return preg_replace_callback(
+            '/(\'[^\'"#]*\')|(#[A-Za-z0-9_]+(?=[\s\n\r\.`]|$))/',
+            function ($matches) {
+                if ($matches[1]) {
+                    return $matches[1]; // Keep content within single quotes unchanged
+                } else {
+                    return $this->configValue('table_prefix').strtolower(substr($matches[0], 1));
+                }
+            },
+            $query
+        );
     }
 
     protected function getParametersString($params): string {

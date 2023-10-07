@@ -61,7 +61,11 @@ class EntityManager {
     /** @var array */
     protected $primaryKeys = [];
 
+    /** @var string */
     protected $tableNamePrefix = '';
+
+    /** @var bool */
+    protected $useEntityHashName = false;
 
     public function __construct(Config $config, Database $db, EventService $events) {
         $this->config = $config;
@@ -70,8 +74,8 @@ class EntityManager {
         $this->tableNamePrefix = $db->configValue('table_prefix');
     }
 
-    public function setTableNamePrefix(string $prefix) {
-        $this->tableNamePrefix = $prefix;
+    public function setUseEntityHashName(bool $value) {
+        $this->useEntityHashName = $value;
     }
 
     public function addColumn(string $className, string $columnName, array $columnData) {
@@ -86,7 +90,15 @@ class EntityManager {
     }
 
     public function tableNameByClass(string $className, bool $withPrefix = true): string {
-        return ($withPrefix ? $this->tableNamePrefix : '').strtolower(substr(strrchr($className, '\\'), 1));
+        $simpleClassName = $this->simpleClassName($className);
+        if ($this->useEntityHashName) {
+            return '#'.$simpleClassName;
+        }
+        return ($withPrefix ? $this->tableNamePrefix : '').strtolower($simpleClassName);
+    }
+
+    protected function simpleClassName(string $fullClassName): string {
+        return substr(strrchr($fullClassName, '\\'), 1);
     }
 
     public function tableNames() {

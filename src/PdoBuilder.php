@@ -2,6 +2,8 @@
 
 namespace Dynart\Micro\Entities;
 
+use PDO;
+
 class PdoBuilder {
 
     /** @var string */
@@ -33,8 +35,8 @@ class PdoBuilder {
         return $this;
     }
 
-    public function build(): \PDO {
-        return new \PDO($this->dsn, $this->username, $this->password, $this->options);
+    public function build(): PDO {
+        return new PDO($this->dsn, $this->username, $this->password, $this->options);
     }
 
 }

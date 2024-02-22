@@ -29,7 +29,7 @@ class QueryExecutor {
             ':dbName'    => $this->db->configValue('name'),
             ':tableName' => $this->em->tableNameByClass($className)
         ]);
-        return $result ? true : false;
+        return (bool)$result;
     }
 
     public function createTable(string $className, bool $ifNotExists = false): void {
@@ -52,7 +52,7 @@ class QueryExecutor {
         return $this->db->fetchAll($sql, $query->variables());
     }
 
-    public function findAllColumn(Query $query, string $column = '') {
+    public function findAllColumn(Query $query, string $column = ''): array {
         $fields = $column ? [$column] : [];
         $sql = $this->queryBuilder->findAll($query, $fields);
         return $this->db->fetchColumn($sql, $query->variables());

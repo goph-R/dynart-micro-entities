@@ -17,7 +17,9 @@
     "minimum-stability": "dev",
     "require": {
         "php": ">=7.1.0",
-        "dynart/micro": "@stable"
+        "dynart/micro": "@stable",
+        "ext-json": "*",
+        "ext-pdo": "*"
     },
     "repositories": {
         "dynart-micro": {

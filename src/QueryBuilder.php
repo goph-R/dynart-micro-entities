@@ -11,8 +11,8 @@ use Dynart\Micro\Config;
  */
 abstract class QueryBuilder {
 
-    const CONFIG_MAX_PAGE_SIZE = 'entities.query_builder.max_page_size';
-    const DEFAULT_MAX_PAGE_SIZE = 1000;
+    const CONFIG_MAX_LIMIT = 'entities.query_builder.max_limit';
+    const DEFAULT_MAX_LIMIT = 1000;
 
     const INDENTATION = '  ';
 
@@ -26,7 +26,7 @@ abstract class QueryBuilder {
 
     protected $currentClassNameForException;
     protected $currentColumnNameForException;
-    protected $maxPageSize;
+    protected $maxLimit;
 
     abstract public function columnDefinition(string $columnName, array $columnData): string;
     abstract public function primaryKeyDefinition(string $className): string;
@@ -39,7 +39,7 @@ abstract class QueryBuilder {
     public function __construct(Config $config, Database $db, EntityManager $entityManager) {
         $this->db = $db;
         $this->em = $entityManager;
-        $this->maxPageSize = $config->get(self::CONFIG_MAX_PAGE_SIZE, self::DEFAULT_MAX_PAGE_SIZE);
+        $this->maxLimit = $config->get(self::CONFIG_MAX_LIMIT, self::DEFAULT_MAX_LIMIT);
     }
 
     public function createTable(string $className, bool $ifNotExists = false): string {
@@ -140,7 +140,7 @@ abstract class QueryBuilder {
         return empty($query->groupBy()) ? '' : ' group by '.join(', ', $query->groupBy());
     }
 
-    protected function orderBy(Query $query) {
+    protected function orderBy(Query $query): string {
         $orders = [];
         $fieldNames = array_keys($query->fields());
         foreach ($query->orderBy() as $orderBy) {
@@ -151,25 +151,26 @@ abstract class QueryBuilder {
         return $orders ? ' order by '.join(', ', $orders) : '';
     }
 
-    protected function limit(Query $query) {
-        if ($query->page() == -1 || $query->pageSize() == -1) {
+    protected function limit(Query $query): string {
+        if ($query->offset() == -1 || $query->max() == -1) {
             return '';
         }
-        $page = $query->page();
-        $pageSize = $query->pageSize();
-        if ($page < 0) {
-            $page = 0;
+        $offset = $query->offset();
+        $max = $query->max();
+        if ($offset < 0) {
+            $offset = 0;
         }
-        if ($pageSize < 1) {
-            $pageSize = 1;
+        if ($max < 1) {
+            $max = 1;
         }
-        if ($pageSize > $this->maxPageSize) {
-            $pageSize = $this->maxPageSize;
+        if ($max > $this->maxLimit) {
+            $max = $this->maxLimit;
         }
-        return ' limit '.($page * $pageSize).', '.$pageSize;
+        return ' limit '.$offset.', '.$max;
     }
 
-    protected function currentColumn() {
+    protected function currentColumn(): string {
+        // TODO: better solution?
         return $this->currentClassNameForException.'::'.$this->currentColumnNameForException;
     }
 }

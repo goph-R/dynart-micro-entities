@@ -23,8 +23,8 @@ class Query {
     protected $conditions = [];
     protected $groups = [];
     protected $orders = [];
-    protected $page = -1;
-    protected $pageSize = -1;
+    protected $offset = -1;
+    protected $max = -1;
 
     /**
      * Query constructor.
@@ -96,17 +96,17 @@ class Query {
         return $this->orders;
     }
 
-    public function setLimit(int $page, int $pageSize): void {
-        $this->page = $page;
-        $this->pageSize = $pageSize;
+    public function setLimit(int $offset, int $max): void {
+        $this->offset = $offset;
+        $this->max = $max;
     }
 
-    public function page(): int {
-        return $this->page;
+    public function offset(): int {
+        return $this->offset;
     }
 
-    public function pageSize(): int {
-        return $this->pageSize;
+    public function max(): int {
+        return $this->max;
     }
 
     private function shouldSelectAllFields(): bool {

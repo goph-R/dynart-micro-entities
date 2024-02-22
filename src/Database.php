@@ -4,13 +4,17 @@ namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Config;
 use Dynart\Micro\Logger;
+use PDO;
+use PDOException;
+use PDOStatement;
+use RuntimeException;
 
 abstract class Database
 {
     protected $configName = 'default';
     protected $connected = false;
 
-    /** @var \PDO */
+    /** @var PDO */
     protected $pdo;
 
     /** @var Config */
@@ -49,7 +53,7 @@ abstract class Database
             if ($this->logger->level() == Logger::DEBUG) { // because of the json_encode
                 $this->logger->debug("Query: $query" . $this->getParametersString($params));
             }
-        } catch (\PDOException $e) {
+        } catch (PDOException $e) {
             $this->logger->error("Error in query: $query" . $this->getParametersString($params));
             throw $e;
         }
@@ -97,18 +101,18 @@ abstract class Database
         return $result;
     }
 
-    protected function setFetchMode(\PDOStatement $stmt, string $className) {
+    protected function setFetchMode(PDOStatement $stmt, string $className) {
         if ($className) {
-            $stmt->setFetchMode(\PDO::FETCH_CLASS | \PDO::FETCH_PROPS_LATE, $className);
+            $stmt->setFetchMode(PDO::FETCH_CLASS | PDO::FETCH_PROPS_LATE, $className);
         } else {
-            $stmt->setFetchMode(\PDO::FETCH_ASSOC);
+            $stmt->setFetchMode(PDO::FETCH_ASSOC);
         }
     }
 
-    public function fetchColumn(string $query, array $params = []) {
-        /** @var \PDOStatement $stmt */
+    public function fetchColumn(string $query, array $params = []): array {
+        /** @var PDOStatement $stmt */
         $stmt = $this->query($query, $params);
-        $rows = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
         $stmt->closeCursor();
         $result = [];
         foreach ($rows as $row) {
@@ -157,7 +161,7 @@ abstract class Database
         $this->query($sql, $params, true);
     }
 
-    public function getInConditionAndParams(array $values, $paramNamePrefix = 'in') {
+    public function getInConditionAndParams(array $values, $paramNamePrefix = 'in'): array {
         $params = [];
         $in = "";
         foreach ($values as $i => $item) {
@@ -169,15 +173,15 @@ abstract class Database
         return [$condition, $params];
     }
 
-    public function beginTransaction() {
+    public function beginTransaction(): bool {
         return $this->pdo->beginTransaction();
     }
 
-    public function commit() {
+    public function commit(): bool {
         return $this->pdo->commit();
     }
 
-    public function rollBack() {
+    public function rollBack(): bool {
         return $this->pdo->rollBack();
     }
 
@@ -186,7 +190,7 @@ abstract class Database
         try {
             call_user_func($callable); // here the CREATE/DROP table can COMMIT implicitly
             $this->commit(); // here it drops an exception because of that
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             // ignore "There is no active transaction"
             if ($e->getMessage() == "There is no active transaction") {
                 return;

@@ -83,9 +83,6 @@ class EntityManager {
             $this->tableNames[$className] = $this->tableNameByClass($className);
             $this->tableColumns[$className] = [];
         }
-        if (!array_key_exists($columnName, $this->tableColumns[$className])) {
-            $this->tableColumns[$className][$columnName] = [];
-        }
         $this->tableColumns[$className][$columnName] = $columnData;
     }
 
@@ -101,18 +98,18 @@ class EntityManager {
         return substr(strrchr($fullClassName, '\\'), 1);
     }
 
-    public function tableNames() {
+    public function tableNames(): array {
         return $this->tableNames;
     }
 
-    public function tableName(string $className) {
+    public function tableName(string $className): string {
         if (!array_key_exists($className, $this->tableNames)) {
             throw new EntityManagerException("Table definition doesn't exist for ".$className);
         }
         return $this->tableNames[$className];
     }
 
-    public function tableColumns(string $className) {
+    public function tableColumns(string $className): array {
         if (!array_key_exists($className, $this->tableColumns)) {
             throw new EntityManagerException("Table definition doesn't exist for ".$className);
         }
@@ -134,7 +131,7 @@ class EntityManager {
         return $result;
     }
 
-    public function isColumn(array $column, string $name) {
+    public function isColumn(array $column, string $name): bool {
         return array_key_exists($name, $column) && $column[$name] === true;
     }
 
@@ -179,7 +176,7 @@ class EntityManager {
 
     public function isPrimaryKeyAutoIncrement(string $className): string {
         $pkName = $this->primaryKey($className);
-        if (is_array($pkName)) { // multi column primary keys can't be auto incremented
+        if (is_array($pkName)) { // multi-column primary keys can't be auto incremented
             return false;
         }
         $pkColumn = $this->tableColumns[$className][$pkName];
@@ -191,7 +188,7 @@ class EntityManager {
         return $this->db->escapeName($this->tableNameByClass($className, $withPrefix));
     }
 
-    public function allTableColumns() {
+    public function allTableColumns(): array {
         return $this->tableColumns;
     }
 
@@ -208,7 +205,7 @@ class EntityManager {
         $condition = $this->primaryKeyCondition($className);
         $safeTableName = $this->safeTableName($className);
         $sql = "select * from $safeTableName where $condition";
-        $params = $this->primaryKeyConditionParams($className, $id); // array_merge?
+        $params = $this->primaryKeyConditionParams($className, $id);
         $result = $this->db->fetch($sql, $params, $className);
         $result->setNew(false);
         return $result;
@@ -257,7 +254,7 @@ class EntityManager {
         }
     }
 
-    public function fetchDataArray(Entity $entity) {
+    public function fetchDataArray(Entity $entity): array {
         $columnKeys = array_keys($this->tableColumns(get_class($entity)));
         $data = [];
         foreach ($columnKeys as $ck) {

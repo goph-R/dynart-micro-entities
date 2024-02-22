@@ -2,4 +2,6 @@
 
 namespace Dynart\Micro\Entities;
 
-class EntityManagerException extends \RuntimeException {}
+use RuntimeException;
+
+class EntityManagerException extends RuntimeException {}

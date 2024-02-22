@@ -18,7 +18,7 @@ abstract class Entity {
         return $this->__isNew;
     }
 
-    public function setNew(bool $value) {
+    public function setNew(bool $value): void {
         $this->__isNew = $value;
     }
 

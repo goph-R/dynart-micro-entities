@@ -2,17 +2,9 @@
 
 namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Config;
-use Dynart\Micro\EventService;
+use Dynart\Micro\ConfigInterface;
+use Dynart\Micro\EventServiceInterface;
 
-/**
- * Manages entities
- *
- * - Stores meta information of the tables by class names
- * - Creates, reads, saves and deletes the entities
- *
- * @package Dynart\Micro\Entities
- */
 class EntityManager {
 
     const COLUMN_TYPE = 'type';
@@ -43,42 +35,25 @@ class EntityManager {
     const ACTION_CASCADE = 'cascade';
     const ACTION_SET_NULL = 'set_null';
 
-    /** @var Config */
-    protected $config;
+    protected array $tableColumns = [];
+    protected array $tableNames = [];
+    protected array $primaryKeys = [];
+    protected string $tableNamePrefix = '';
+    protected bool $useEntityHashName = false;
 
-    /** @var Database */
-    protected $db;
-
-    /** @var EventService */
-    protected $events;
-
-    /** @var array */
-    protected $tableColumns = [];
-
-    /** @var array */
-    protected $tableNames = [];
-
-    /** @var array */
-    protected $primaryKeys = [];
-
-    /** @var string */
-    protected $tableNamePrefix = '';
-
-    /** @var bool */
-    protected $useEntityHashName = false;
-
-    public function __construct(Config $config, Database $db, EventService $events) {
-        $this->config = $config;
-        $this->db = $db;
-        $this->events = $events;
+    public function __construct(
+        protected ConfigInterface $config,
+        protected Database $db,
+        protected EventServiceInterface $events,
+    ) {
         $this->tableNamePrefix = $db->configValue('table_prefix');
     }
 
-    public function setUseEntityHashName(bool $value) {
+    public function setUseEntityHashName(bool $value): void {
         $this->useEntityHashName = $value;
     }
 
-    public function addColumn(string $className, string $columnName, array $columnData) {
+    public function addColumn(string $className, string $columnName, array $columnData): void {
         if (!array_key_exists($className, $this->tableNames)) {
             $this->tableNames[$className] = $this->tableNameByClass($className);
             $this->tableColumns[$className] = [];
@@ -116,7 +91,7 @@ class EntityManager {
         return $this->tableColumns[$className];
     }
 
-    public function primaryKey(string $className) {
+    public function primaryKey(string $className): string|array|null {
         if (array_key_exists($className, $this->primaryKeys)) {
             return $this->primaryKeys[$className];
         }
@@ -135,7 +110,7 @@ class EntityManager {
         return array_key_exists($name, $column) && $column[$name] === true;
     }
 
-    public function primaryKeyValue(string $className, array $data) {
+    public function primaryKeyValue(string $className, array $data): mixed {
         $primaryKey = $this->primaryKey($className);
         if (is_array($primaryKey)) {
             $result = [];
@@ -161,7 +136,7 @@ class EntityManager {
         }
     }
 
-    public function primaryKeyConditionParams(string $className, $pkValue): array {
+    public function primaryKeyConditionParams(string $className, mixed $pkValue): array {
         $result = [];
         $primaryKey = $this->primaryKey($className);
         if (is_array($primaryKey) && is_array($pkValue)) {
@@ -174,7 +149,7 @@ class EntityManager {
         return $result;
     }
 
-    public function isPrimaryKeyAutoIncrement(string $className): string {
+    public function isPrimaryKeyAutoIncrement(string $className): bool {
         $pkName = $this->primaryKey($className);
         if (is_array($pkName)) { // multi-column primary keys can't be auto incremented
             return false;
@@ -182,7 +157,6 @@ class EntityManager {
         $pkColumn = $this->tableColumns[$className][$pkName];
         return $this->isColumn($pkColumn, self::COLUMN_AUTO_INCREMENT);
     }
-
 
     public function safeTableName(string $className, bool $withPrefix = true): string {
         return $this->db->escapeName($this->tableNameByClass($className, $withPrefix));
@@ -192,16 +166,16 @@ class EntityManager {
         return $this->tableColumns;
     }
 
-    public function insert(string $className, array $data) {
+    public function insert(string $className, array $data): string|false {
         $this->db->insert($this->tableName($className), $data);
         return $this->db->lastInsertId();
     }
 
-    public function update(string $className, array $data, string $condition='', array $conditionParams=[]) {
+    public function update(string $className, array $data, string $condition = '', array $conditionParams = []): void {
         $this->db->update($this->tableName($className), $data, $condition, $conditionParams);
     }
 
-    public function findById(string $className, $id) {
+    public function findById(string $className, mixed $id): Entity {
         $condition = $this->primaryKeyCondition($className);
         $safeTableName = $this->safeTableName($className);
         $sql = "select * from $safeTableName where $condition";
@@ -211,18 +185,18 @@ class EntityManager {
         return $result;
     }
 
-    public function deleteById(string $className, int $id) {
+    public function deleteById(string $className, int $id): void {
         $sql = "delete from {$this->safeTableName($className)} where id = :id limit 1";
         $this->db->query($sql, [':id' => $id]);
     }
 
-    public function deleteByIds(string $className, array $ids) {
-        list($condition, $params) = $this->db->getInConditionAndParams($ids);
+    public function deleteByIds(string $className, array $ids): void {
+        [$condition, $params] = $this->db->getInConditionAndParams($ids);
         $sql = "delete from {$this->safeTableName($className)} where id in ($condition)";
         $this->db->query($sql, $params);
     }
 
-    public function save(Entity $entity) {
+    public function save(Entity $entity): void {
         $this->events->emit($entity->beforeSaveEvent(), [$entity]);
         $className = get_class($entity);
         $tableName = $this->tableName($className);
@@ -243,7 +217,7 @@ class EntityManager {
         $this->events->emit($entity->afterSaveEvent(), [$entity]);
     }
 
-    public function setByDataArray(Entity $entity, array $data) {
+    public function setByDataArray(Entity $entity, array $data): void {
         $className = get_class($entity);
         $columnKeys = array_keys($this->tableColumns($className));
         foreach ($data as $n => $v) {

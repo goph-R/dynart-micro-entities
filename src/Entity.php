@@ -2,17 +2,12 @@
 
 namespace Dynart\Micro\Entities;
 
-/**
- * An abstract class for entities
- *
- * @package Dynart\Micro\Entities
- */
 abstract class Entity {
 
     const EVENT_BEFORE_SAVE = 'before_save';
     const EVENT_AFTER_SAVE = 'after_save';
 
-    private $__isNew = true;
+    private bool $__isNew = true;
 
     public function isNew(): bool {
         return $this->__isNew;

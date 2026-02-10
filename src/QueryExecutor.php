@@ -2,27 +2,13 @@
 
 namespace Dynart\Micro\Entities;
 
-/**
- * Executes an SQL query
- *
- * @package Dynart\Micro\Entities
- */
 class QueryExecutor {
 
-    /** @var QueryBuilder */
-    protected $queryBuilder;
-
-    /** @var Database */
-    protected $db;
-
-    /** @var EntityManager */
-    protected $em;
-
-    public function __construct(Database $db, EntityManager $em, QueryBuilder $qb) {
-        $this->db = $db;
-        $this->em = $em;
-        $this->queryBuilder = $qb;
-    }
+    public function __construct(
+        protected Database $db,
+        protected EntityManager $em,
+        protected QueryBuilder $queryBuilder,
+    ) {}
 
     public function isTableExist(string $className): bool {
         $result = $this->db->fetchOne($this->queryBuilder->isTableExist(':dbName', ':tableName'), [
@@ -47,7 +33,7 @@ class QueryExecutor {
         return $this->queryBuilder->columnsByTableDescription($this->db->fetchAll($sql));
     }
 
-    public function findAll(Query $query, array $fields = []) {
+    public function findAll(Query $query, array $fields = []): array {
         $sql = $this->queryBuilder->findAll($query, $fields);
         return $this->db->fetchAll($sql, $query->variables());
     }
@@ -58,7 +44,7 @@ class QueryExecutor {
         return $this->db->fetchColumn($sql, $query->variables());
     }
 
-    public function findAllCount(Query $query) {
+    public function findAllCount(Query $query): mixed {
         $sql = $this->queryBuilder->findAllCount($query);
         return $this->db->fetchOne($sql, $query->variables());
     }

@@ -2,13 +2,8 @@
 
 namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Config;
+use Dynart\Micro\ConfigInterface;
 
-/**
- * Builds an SQL query
- *
- * @package Dynart\Micro\Entities
- */
 abstract class QueryBuilder {
 
     const CONFIG_MAX_LIMIT = 'entities.query_builder.max_limit';
@@ -16,17 +11,11 @@ abstract class QueryBuilder {
 
     const INDENTATION = '  ';
 
-    private static $subQueryCounter = 0;
+    private static int $subQueryCounter = 0;
 
-    /** @var Database */
-    protected $db;
-
-    /** @var EntityManager */
-    protected $em;
-
-    protected $currentClassNameForException;
-    protected $currentColumnNameForException;
-    protected $maxLimit;
+    protected string $currentClassNameForException = '';
+    protected string $currentColumnNameForException = '';
+    protected int $maxLimit;
 
     abstract public function columnDefinition(string $columnName, array $columnData): string;
     abstract public function primaryKeyDefinition(string $className): string;
@@ -36,9 +25,11 @@ abstract class QueryBuilder {
     abstract public function describeTable(string $className): string;
     abstract public function columnsByTableDescription(array $data): array;
 
-    public function __construct(Config $config, Database $db, EntityManager $entityManager) {
-        $this->db = $db;
-        $this->em = $entityManager;
+    public function __construct(
+        ConfigInterface $config,
+        protected Database $db,
+        protected EntityManager $em,
+    ) {
         $this->maxLimit = $config->get(self::CONFIG_MAX_LIMIT, self::DEFAULT_MAX_LIMIT);
     }
 
@@ -109,7 +100,6 @@ abstract class QueryBuilder {
         $selectFields = empty($fields) ? $query->fields() : $fields;
         $queryFrom = $query->from();
         if (is_subclass_of($queryFrom, Query::class)) {
-            /** @var Query $queryFrom */
             self::$subQueryCounter++; // TODO: better solution?
             $from = '('.$this->findAll($queryFrom, []).') S'.self::$subQueryCounter;
         } else {
@@ -121,7 +111,7 @@ abstract class QueryBuilder {
     protected function joins(Query $query): string {
         $joins = [];
         foreach ($query->joins() as $join) {
-            list($type, $from, $condition) = $join;
+            [$type, $from, $condition] = $join;
             $fromStr = is_array($from)
                 ? $this->em->safeTableName($from[0]).' as '.$this->db->escapeName($from[1])
                 : $this->em->safeTableName($from);

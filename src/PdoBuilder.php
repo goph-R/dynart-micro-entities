@@ -6,31 +6,27 @@ use PDO;
 
 class PdoBuilder {
 
-    /** @var string */
-    protected $dsn;
-    /** @var string */
-    protected $username;
-    /** @var string */
-    protected $password;
-    /** @var array */
-    protected $options;
+    protected string $dsn = '';
+    protected string $username = '';
+    protected string $password = '';
+    protected array $options = [];
 
-    public function dsn(string $value): PdoBuilder {
+    public function dsn(string $value): static {
         $this->dsn = $value;
         return $this;
     }
 
-    public function username(string $value): PdoBuilder {
+    public function username(string $value): static {
         $this->username = $value;
         return $this;
     }
 
-    public function password(string $value): PdoBuilder {
+    public function password(string $value): static {
         $this->password = $value;
         return $this;
     }
 
-    public function options(array $value): PdoBuilder {
+    public function options(array $value): static {
         $this->options = $value;
         return $this;
     }
@@ -38,5 +34,4 @@ class PdoBuilder {
     public function build(): PDO {
         return new PDO($this->dsn, $this->username, $this->password, $this->options);
     }
-
 }

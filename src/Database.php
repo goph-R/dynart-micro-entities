@@ -2,39 +2,29 @@
 
 namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Config;
-use Dynart\Micro\Logger;
+use Dynart\Micro\ConfigInterface;
+use Dynart\Micro\LoggerInterface;
 use PDO;
 use PDOException;
 use PDOStatement;
+use Psr\Log\LogLevel;
 use RuntimeException;
 
 abstract class Database
 {
-    protected $configName = 'default';
-    protected $connected = false;
-
-    /** @var PDO */
-    protected $pdo;
-
-    /** @var Config */
-    protected $config;
-
-    /** @var Logger */
-    protected $logger;
-
-    /** @var PdoBuilder */
-    protected $pdoBuilder;
+    protected string $configName = 'default';
+    protected bool $connected = false;
+    protected ?PDO $pdo = null;
 
     abstract protected function connect(): void;
     abstract public function escapeName(string $name): string;
     abstract public function escapeLike(string $string): string;
 
-    public function __construct(Config $config, Logger $logger, PdoBuilder $pdoBuilder) {
-        $this->config = $config;
-        $this->logger = $logger;
-        $this->pdoBuilder = $pdoBuilder;
-    }
+    public function __construct(
+        protected ConfigInterface $config,
+        protected LoggerInterface $logger,
+        protected PdoBuilder $pdoBuilder,
+    ) {}
 
     public function connected(): bool {
         return $this->connected;
@@ -44,13 +34,13 @@ abstract class Database
         $this->connected = $value;
     }
 
-    public function query(string $query, array $params = [], bool $closeCursor = false) {
+    public function query(string $query, array $params = [], bool $closeCursor = false): PDOStatement {
         try {
             $this->connect();
             $query = $this->replaceClassHashNamesWithTableNames($query);
             $stmt = $this->pdo->prepare($query);
             $stmt->execute($params);
-            if ($this->logger->level() == Logger::DEBUG) { // because of the json_encode
+            if ($this->logger->level() == LogLevel::DEBUG) {
                 $this->logger->debug("Query: $query" . $this->getParametersString($params));
             }
         } catch (PDOException $e) {
@@ -63,7 +53,7 @@ abstract class Database
         return $stmt;
     }
 
-    protected function replaceClassHashNamesWithTableNames(string $query) {
+    protected function replaceClassHashNamesWithTableNames(string $query): string {
         return preg_replace_callback(
             '/(\'[^\'"#]*\')|(#[A-Za-z0-9_]+(?=[\s\n\r\.`]|$))/',
             function ($matches) {
@@ -77,15 +67,15 @@ abstract class Database
         );
     }
 
-    protected function getParametersString($params): string {
-        return $params ? "\nParameters: " . ($params ? json_encode($params) : '') : "";
+    protected function getParametersString(array $params): string {
+        return $params ? "\nParameters: " . json_encode($params) : "";
     }
 
-    public function configValue(string $name) {
+    public function configValue(string $name): mixed {
         return $this->config->get("database.{$this->configName}.$name", "db_{$name}_missing");
     }
 
-    public function fetch($query, $params = [], string $className = '') {
+    public function fetch(string $query, array $params = [], string $className = ''): mixed {
         $stmt = $this->query($query, $params);
         $this->setFetchMode($stmt, $className);
         $result = $stmt->fetch();
@@ -93,7 +83,7 @@ abstract class Database
         return $result;
     }
 
-    public function fetchAll(string $query, array $params = [], string $className = '') {
+    public function fetchAll(string $query, array $params = [], string $className = ''): array {
         $stmt = $this->query($query, $params);
         $this->setFetchMode($stmt, $className);
         $result = $stmt->fetchAll();
@@ -101,7 +91,7 @@ abstract class Database
         return $result;
     }
 
-    protected function setFetchMode(PDOStatement $stmt, string $className) {
+    protected function setFetchMode(PDOStatement $stmt, string $className): void {
         if ($className) {
             $stmt->setFetchMode(PDO::FETCH_CLASS | PDO::FETCH_PROPS_LATE, $className);
         } else {
@@ -110,7 +100,6 @@ abstract class Database
     }
 
     public function fetchColumn(string $query, array $params = []): array {
-        /** @var PDOStatement $stmt */
         $stmt = $this->query($query, $params);
         $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
         $stmt->closeCursor();
@@ -121,18 +110,18 @@ abstract class Database
         return $result;
     }
 
-    public function fetchOne(string $query, array $params = []) {
+    public function fetchOne(string $query, array $params = []): mixed {
         $stmt = $this->query($query, $params);
         $result = $stmt->fetchColumn(0);
         $stmt = null;
         return $result;
     }
 
-    public function lastInsertId($name = null) {
+    public function lastInsertId(?string $name = null): string|false {
         return $this->pdo->lastInsertId($name);
     }
 
-    public function insert(string $tableName, array $data) {
+    public function insert(string $tableName, array $data): void {
         $tableName = $this->escapeName($tableName);
         $params = [];
         $names = [];
@@ -146,7 +135,7 @@ abstract class Database
         $this->query($sql, $params, true);
     }
 
-    public function update(string $tableName, array $data, string $condition = '', array $conditionParams = []) {
+    public function update(string $tableName, array $data, string $condition = '', array $conditionParams = []): void {
         $tableName = $this->escapeName($tableName);
         $params = [];
         $pairs = [];
@@ -161,7 +150,7 @@ abstract class Database
         $this->query($sql, $params, true);
     }
 
-    public function getInConditionAndParams(array $values, $paramNamePrefix = 'in'): array {
+    public function getInConditionAndParams(array $values, string $paramNamePrefix = 'in'): array {
         $params = [];
         $in = "";
         foreach ($values as $i => $item) {
@@ -185,7 +174,7 @@ abstract class Database
         return $this->pdo->rollBack();
     }
 
-    public function runInTransaction($callable) {
+    public function runInTransaction(callable $callable): void {
         $this->beginTransaction();
         try {
             call_user_func($callable); // here the CREATE/DROP table can COMMIT implicitly

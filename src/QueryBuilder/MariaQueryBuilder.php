@@ -70,7 +70,7 @@ class MariaQueryBuilder extends QueryBuilder {
         if (count($columnData[EntityManager::COLUMN_FOREIGN_KEY]) != 2) {
             throw new EntityManagerException("Foreign key definition array size must be 2: ".$this->currentColumn());
         }
-        list($foreignClassName, $foreignColumnName) = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
+        [$foreignClassName, $foreignColumnName] = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
         $result = 'foreign key ('.$this->db->escapeName($columnName).')'
             .' references '.$this->em->safeTableName($foreignClassName)
             .' ('.$this->db->escapeName($foreignColumnName).')';
@@ -100,19 +100,19 @@ class MariaQueryBuilder extends QueryBuilder {
         return [];
     }
 
-    protected function checkIntSize($size) {
+    protected function checkIntSize(mixed $size): void {
         if ($size && !is_int($size)) {
             throw new EntityManagerException("The size has to be an integer! ".$this->currentColumn());
         }
     }
 
-    protected function checkArraySize($size, $count) {
+    protected function checkArraySize(mixed $size, int $count): void {
         if (!is_array($size) || count($size) != $count) {
             throw new EntityManagerException("The size array has to have $count elements! ".$this->currentColumn());
         }
     }
 
-    protected function sqlType(string $type, $size, bool $fixSize): string {
+    protected function sqlType(string $type, mixed $size, bool $fixSize): string {
         switch ($type) {
             case EntityManager::TYPE_BOOL:
             case EntityManager::TYPE_DATE:
@@ -146,17 +146,14 @@ class MariaQueryBuilder extends QueryBuilder {
     }
 
     protected function sqlAction(string $action): string {
-        switch ($action) {
-            case EntityManager::ACTION_CASCADE:
-                return 'cascade';
-            case EntityManager::ACTION_SET_NULL:
-                return 'set null';
-            default:
-                throw new EntityManagerException("Unknown action '$action': : ".$this->currentColumn());
-        }
+        return match ($action) {
+            EntityManager::ACTION_CASCADE => 'cascade',
+            EntityManager::ACTION_SET_NULL => 'set null',
+            default => throw new EntityManagerException("Unknown action '$action': : ".$this->currentColumn()),
+        };
     }
 
-    protected function sqlDefaultValue($value, string $type, int $size): string {
+    protected function sqlDefaultValue(mixed $value, string $type, int $size): string {
         if ($type == EntityManager::TYPE_BLOB || ($type == EntityManager::TYPE_STRING && !$size)) {
             throw new EntityManagerException("Text and blob types can't have a default value: ".$this->currentColumn());
         }

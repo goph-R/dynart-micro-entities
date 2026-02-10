@@ -4,11 +4,6 @@ namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Micro;
 
-/**
- * Represents an SQL SELECT query
- *
- * @package Dynart\Micro\Entities
- */
 class Query {
 
     const INNER_JOIN = 'inner';
@@ -16,25 +11,21 @@ class Query {
     const RIGHT_JOIN = 'right';
     const OUTER_JOIN = 'full outer';
 
-    protected $from = '';
-    protected $variables = [];
-    protected $fields = [];
-    protected $joins = [];
-    protected $conditions = [];
-    protected $groups = [];
-    protected $orders = [];
-    protected $offset = -1;
-    protected $max = -1;
+    protected string|Query $from;
+    protected array $variables = [];
+    protected array $fields = [];
+    protected array $joins = [];
+    protected array $conditions = [];
+    protected array $groups = [];
+    protected array $orders = [];
+    protected int $offset = -1;
+    protected int $max = -1;
 
-    /**
-     * Query constructor.
-     * @param string|Query $from The source of the query (Entity::class or a Query instance)
-     */
-    public function __construct($from) {
+    public function __construct(string|Query $from) {
         $this->from = $from;
     }
 
-    public function from() {
+    public function from(): string|Query {
         return $this->from;
     }
 
@@ -67,16 +58,16 @@ class Query {
         return $this->conditions;
     }
 
-    public function addInnerJoin($from, string $condition, array $variables = []): void {
+    public function addInnerJoin(string|array $from, string $condition, array $variables = []): void {
         $this->addJoin(self::INNER_JOIN, $from, $condition, $variables);
     }
 
-    public function addJoin(string $type, $from, string $condition, array $variables = []): void {
+    public function addJoin(string $type, string|array $from, string $condition, array $variables = []): void {
         $this->joins[] = [$type, $from, $condition];
         $this->addVariables($variables);
     }
 
-    public function joins() {
+    public function joins(): array {
         return $this->joins;
     }
 

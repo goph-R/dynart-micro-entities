@@ -182,6 +182,7 @@ class EntityManager {
         $params = $this->primaryKeyConditionParams($className, $id);
         $result = $this->db->fetch($sql, $params, $className);
         $result->setNew(false);
+        $result->takeSnapshot($this->fetchDataArray($result));
         return $result;
     }
 
@@ -206,13 +207,20 @@ class EntityManager {
             if ($this->isPrimaryKeyAutoIncrement($className)) {
                 $pkName = $this->primaryKey($className);
                 $entity->$pkName = $this->db->lastInsertId();
+                $data[$pkName] = $entity->$pkName;
             }
+            $entity->setNew(false);
+            $entity->takeSnapshot($data);
         } else {
-            $this->db->update(
-                $tableName, $data,
-                $this->primaryKeyCondition($className),
-                $this->primaryKeyConditionParams($className, $this->primaryKeyValue($className, $data))
-            );
+            $dirtyData = $entity->getDirtyFields($data);
+            if ($dirtyData !== []) {
+                $this->db->update(
+                    $tableName, $dirtyData,
+                    $this->primaryKeyCondition($className),
+                    $this->primaryKeyConditionParams($className, $this->primaryKeyValue($className, $data))
+                );
+                $entity->takeSnapshot($data);
+            }
         }
         $this->events->emit($entity->afterSaveEvent(), [$entity]);
     }
@@ -226,6 +234,7 @@ class EntityManager {
             }
             $entity->$n = $v;
         }
+        $entity->takeSnapshot($this->fetchDataArray($entity));
     }
 
     public function fetchDataArray(Entity $entity): array {

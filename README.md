@@ -1,6 +1,6 @@
 # dynart-micro-entities
 
-PDO-based ORM / entity library for the [dynart-micro](../dynart-micro) framework.
+PDO-based ORM / entity library for the [dynart-micro](https://github.com/goph-R/dynart-micro) framework.
 
 Provides database abstraction, PHP 8 attribute-driven entity metadata, query building, and full CRUD with dirty-field tracking.
 
@@ -280,7 +280,7 @@ Multiple database connections are supported by changing the `configName` propert
 
 ## Testing
 
-The test suite lives in the separate repository **[dynart-micro-entities-test](../dynart-micro-entities-test)**, which symlinks this library via a Composer path repository.
+The test suite lives in the separate repository **[dynart-micro-entities-test](https://github.com/goph-R/dynart-micro-entities-test)**, which symlinks this library via a Composer path repository.
 
 ```bash
 # Unit tests (no DB required)
@@ -290,4 +290,4 @@ php vendor/bin/phpunit --testsuite unit --stderr
 php vendor/bin/phpunit --testsuite integration --stderr
 ```
 
-See the test project's [README](../dynart-micro-entities-test/README.md) for setup instructions.
+See the test project's [README](https://github.com/goph-R/dynart-micro-entities-test/README.md) for setup instructions.

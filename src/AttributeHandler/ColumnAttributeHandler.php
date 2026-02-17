@@ -4,6 +4,7 @@ namespace Dynart\Micro\Entities\AttributeHandler;
 
 use Dynart\Micro\AttributeHandlerInterface;
 use Dynart\Micro\Entities\Attribute\Column;
+use Dynart\Micro\Entities\EntityManager;
 
 class ColumnAttributeHandler implements AttributeHandlerInterface {
 

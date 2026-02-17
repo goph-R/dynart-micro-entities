@@ -2,39 +2,35 @@
 
 namespace Dynart\Micro\Entities\QueryBuilder;
 
-use Dynart\Micro\Entities\EntityManager;
+use Dynart\Micro\Entities\Attribute\Column;
 use Dynart\Micro\Entities\EntityManagerException;
 use Dynart\Micro\Entities\QueryBuilder;
 
 class MariaQueryBuilder extends QueryBuilder {
 
     const SIMPLE_TYPE_MAP = [
-        EntityManager::TYPE_LONG     => 'bigint',
-        EntityManager::TYPE_INT      => 'int',
-        EntityManager::TYPE_FLOAT    => 'float',
-        EntityManager::TYPE_DOUBLE   => 'double',
-        EntityManager::TYPE_BOOL     => 'tinyint(1)',
-        EntityManager::TYPE_DATE     => 'date',
-        EntityManager::TYPE_TIME     => 'time',
-        EntityManager::TYPE_DATETIME => 'datetime',
-        EntityManager::TYPE_BLOB     => 'blob'
+        Column::TYPE_LONG     => 'bigint',
+        Column::TYPE_INT      => 'int',
+        Column::TYPE_FLOAT    => 'float',
+        Column::TYPE_DOUBLE   => 'double',
+        Column::TYPE_BOOL     => 'tinyint(1)',
+        Column::TYPE_DATE     => 'date',
+        Column::TYPE_TIME     => 'time',
+        Column::TYPE_DATETIME => 'datetime',
+        Column::TYPE_BLOB     => 'blob'
     ];
 
-    public function columnDefinition(string $columnName, array $columnData): string {
+    public function columnDefinition(string $columnName, Column $column): string {
         $parts = [$this->db->escapeName($columnName)];
-        $type = $columnData[EntityManager::COLUMN_TYPE];
-        $size = array_key_exists(EntityManager::COLUMN_SIZE, $columnData) ? $columnData[EntityManager::COLUMN_SIZE] : 0;
-        $fixSize = $this->em->isColumn($columnData, EntityManager::COLUMN_FIX_SIZE);
-        $parts[] = $this->sqlType($type, $size, $fixSize);
-        if ($this->em->isColumn($columnData, EntityManager::COLUMN_NOT_NULL)) {
+        $parts[] = $this->sqlType($column->type, $column->size, $column->fixSize);
+        if ($column->notNull) {
             $parts[] = 'not null';
         }
-        if ($this->em->isColumn($columnData, EntityManager::COLUMN_AUTO_INCREMENT)) {
+        if ($column->autoIncrement) {
             $parts[] = 'auto_increment';
         }
-        if (array_key_exists(EntityManager::COLUMN_DEFAULT, $columnData)) {
-            $value = $this->sqlDefaultValue($columnData[EntityManager::COLUMN_DEFAULT], $type, $size);
-            $parts[] = "default $value";
+        if ($column->default !== null) {
+            $parts[] = "default ".$this->sqlDefaultValue($column->default, $column->type, $column->size);
         }
         return join(' ', $parts);
     }
@@ -59,26 +55,22 @@ class MariaQueryBuilder extends QueryBuilder {
         return $result;
     }
 
-    public function foreignKeyDefinition(string $columnName, array $columnData): string {
-        $result = '';
-        if (!array_key_exists(EntityManager::COLUMN_FOREIGN_KEY, $columnData)) {
-            return $result;
+    public function foreignKeyDefinition(string $columnName, Column $column): string {
+        if ($column->foreignKey === null) {
+            return '';
         }
-        if (!is_array($columnData[EntityManager::COLUMN_FOREIGN_KEY])) {
-            throw new EntityManagerException("Foreign key definition must be an array: ".$this->currentColumn());
-        }
-        if (count($columnData[EntityManager::COLUMN_FOREIGN_KEY]) != 2) {
+        if (count($column->foreignKey) != 2) {
             throw new EntityManagerException("Foreign key definition array size must be 2: ".$this->currentColumn());
         }
-        [$foreignClassName, $foreignColumnName] = $columnData[EntityManager::COLUMN_FOREIGN_KEY];
+        [$foreignClassName, $foreignColumnName] = $column->foreignKey;
         $result = 'foreign key ('.$this->db->escapeName($columnName).')'
             .' references '.$this->em->safeTableName($foreignClassName)
             .' ('.$this->db->escapeName($foreignColumnName).')';
-        if (array_key_exists(EntityManager::COLUMN_ON_DELETE, $columnData)) {
-            $result .= ' on delete '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_DELETE]);
+        if ($column->onDelete !== null) {
+            $result .= ' on delete '.$this->sqlAction($column->onDelete);
         }
-        if (array_key_exists(EntityManager::COLUMN_ON_UPDATE, $columnData)) {
-            $result .= ' on update '.$this->sqlAction($columnData[EntityManager::COLUMN_ON_UPDATE]);
+        if ($column->onUpdate !== null) {
+            $result .= ' on update '.$this->sqlAction($column->onUpdate);
         }
         return $result;
     }
@@ -114,26 +106,26 @@ class MariaQueryBuilder extends QueryBuilder {
 
     protected function sqlType(string $type, mixed $size, bool $fixSize): string {
         switch ($type) {
-            case EntityManager::TYPE_BOOL:
-            case EntityManager::TYPE_DATE:
-            case EntityManager::TYPE_TIME:
-            case EntityManager::TYPE_DATETIME:
-            case EntityManager::TYPE_BLOB:
+            case Column::TYPE_BOOL:
+            case Column::TYPE_DATE:
+            case Column::TYPE_TIME:
+            case Column::TYPE_DATETIME:
+            case Column::TYPE_BLOB:
                 return self::SIMPLE_TYPE_MAP[$type];
 
-            case EntityManager::TYPE_LONG:
-            case EntityManager::TYPE_INT:
-            case EntityManager::TYPE_FLOAT:
-            case EntityManager::TYPE_DOUBLE:
+            case Column::TYPE_LONG:
+            case Column::TYPE_INT:
+            case Column::TYPE_FLOAT:
+            case Column::TYPE_DOUBLE:
                 $this->checkIntSize($size);
                 $mappedType = self::SIMPLE_TYPE_MAP[$type];
                 return $size ? "$mappedType($size)" : $mappedType;
 
-            case EntityManager::TYPE_NUMERIC:
+            case Column::TYPE_NUMERIC:
                 $this->checkArraySize($size, 2);
                 return "decimal($size[0], $size[1])";
 
-            case EntityManager::TYPE_STRING:
+            case Column::TYPE_STRING:
                 if (!$size) {
                     return 'longtext';
                 }
@@ -147,14 +139,14 @@ class MariaQueryBuilder extends QueryBuilder {
 
     protected function sqlAction(string $action): string {
         return match ($action) {
-            EntityManager::ACTION_CASCADE => 'cascade',
-            EntityManager::ACTION_SET_NULL => 'set null',
+            Column::ACTION_CASCADE => 'cascade',
+            Column::ACTION_SET_NULL => 'set null',
             default => throw new EntityManagerException("Unknown action '$action': : ".$this->currentColumn()),
         };
     }
 
-    protected function sqlDefaultValue(mixed $value, string $type, int $size): string {
-        if ($type == EntityManager::TYPE_BLOB || ($type == EntityManager::TYPE_STRING && !$size)) {
+    protected function sqlDefaultValue(mixed $value, string $type, int|array $size): string {
+        if ($type == Column::TYPE_BLOB || ($type == Column::TYPE_STRING && !$size)) {
             throw new EntityManagerException("Text and blob types can't have a default value: ".$this->currentColumn());
         }
         if ($value === null) {
@@ -164,24 +156,24 @@ class MariaQueryBuilder extends QueryBuilder {
                 throw new EntityManagerException("Raw default value (array) only can have one element: ".$this->currentColumn());
             }
             return $value[0];
-        } else if ($type == EntityManager::TYPE_STRING) {
+        } else if ($type == Column::TYPE_STRING) {
             return "'".str_replace("'", "\\'", $value)."'";
-        } else if ($this->isDateType($type) && $value == EntityManager::DEFAULT_NOW) {
+        } else if ($this->isDateType($type) && $value == Column::NOW) {
             switch ($type) {
-                case EntityManager::TYPE_DATETIME:
+                case Column::TYPE_DATETIME:
                     return 'utc_timestamp()';
-                case EntityManager::TYPE_DATE:
+                case Column::TYPE_DATE:
                     return 'utc_date()';
-                case EntityManager::TYPE_TIME:
+                case Column::TYPE_TIME:
                     return 'utc_time()';
             }
-        } else if ($type == EntityManager::TYPE_BOOL && is_bool($value)) {
+        } else if ($type == Column::TYPE_BOOL && is_bool($value)) {
             return $value ? '1' : '0';
         }
         return $value;
     }
 
     protected function isDateType(string $type): bool {
-        return in_array($type, [EntityManager::TYPE_DATE, EntityManager::TYPE_TIME, EntityManager::TYPE_DATETIME]);
+        return in_array($type, [Column::TYPE_DATE, Column::TYPE_TIME, Column::TYPE_DATETIME]);
     }
 }

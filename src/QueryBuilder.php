@@ -3,6 +3,7 @@
 namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\ConfigInterface;
+use Dynart\Micro\Entities\Attribute\Column;
 
 abstract class QueryBuilder {
 
@@ -17,9 +18,9 @@ abstract class QueryBuilder {
     protected string $currentColumnNameForException = '';
     protected int $maxLimit;
 
-    abstract public function columnDefinition(string $columnName, array $columnData): string;
+    abstract public function columnDefinition(string $columnName, Column $column): string;
     abstract public function primaryKeyDefinition(string $className): string;
-    abstract public function foreignKeyDefinition(string $columnName, array $columnData): string;
+    abstract public function foreignKeyDefinition(string $columnName, Column $column): string;
     abstract public function isTableExist(string $dbNameParam, string $tableNameParam): string;
     abstract public function listTables(): string;
     abstract public function describeTable(string $className): string;
@@ -37,10 +38,10 @@ abstract class QueryBuilder {
         $this->currentClassNameForException = $className;
         $allColumnDef = [];
         $allForeignKeyDef = [];
-        foreach ($this->em->tableColumns($className) as $columnName => $columnData) {
+        foreach ($this->em->tableColumns($className) as $columnName => $column) {
             $this->currentColumnNameForException = $columnName;
-            $allColumnDef[] = self::INDENTATION . $this->columnDefinition($columnName, $columnData);
-            $foreignKeyDef = $this->foreignKeyDefinition($columnName, $columnData);
+            $allColumnDef[] = self::INDENTATION . $this->columnDefinition($columnName, $column);
+            $foreignKeyDef = $this->foreignKeyDefinition($columnName, $column);
             if ($foreignKeyDef) {
                 $allForeignKeyDef[] = self::INDENTATION . $foreignKeyDef;
             }

@@ -4,36 +4,9 @@ namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\ConfigInterface;
 use Dynart\Micro\EventServiceInterface;
+use Dynart\Micro\Entities\Attribute\Column;
 
 class EntityManager {
-
-    const COLUMN_TYPE = 'type';
-    const COLUMN_SIZE = 'size';
-    const COLUMN_FIX_SIZE = 'fixSize';
-    const COLUMN_NOT_NULL = 'notNull';
-    const COLUMN_AUTO_INCREMENT = 'autoIncrement';
-    const COLUMN_DEFAULT = 'default';
-    const COLUMN_PRIMARY_KEY = 'primaryKey';
-    const COLUMN_FOREIGN_KEY = 'foreignKey';
-    const COLUMN_ON_DELETE = 'onDelete';
-    const COLUMN_ON_UPDATE = 'onUpdate';
-
-    const TYPE_INT = 'int';
-    const TYPE_LONG = 'long';
-    const TYPE_FLOAT = 'float';
-    const TYPE_DOUBLE = 'double';
-    const TYPE_NUMERIC = 'numeric';
-    const TYPE_STRING = 'string';
-    const TYPE_BOOL = 'bool';
-    const TYPE_DATE = 'date';
-    const TYPE_TIME = 'time';
-    const TYPE_DATETIME = 'datetime';
-    const TYPE_BLOB = 'blob';
-
-    const DEFAULT_NOW = 'now';
-
-    const ACTION_CASCADE = 'cascade';
-    const ACTION_SET_NULL = 'set_null';
 
     protected array $tableColumns = [];
     protected array $tableNames = [];
@@ -53,12 +26,12 @@ class EntityManager {
         $this->useEntityHashName = $value;
     }
 
-    public function addColumn(string $className, string $columnName, array $columnData): void {
+    public function addColumn(string $className, string $columnName, Column $column): void {
         if (!array_key_exists($className, $this->tableNames)) {
             $this->tableNames[$className] = $this->tableNameByClass($className);
             $this->tableColumns[$className] = [];
         }
-        $this->tableColumns[$className][$columnName] = $columnData;
+        $this->tableColumns[$className][$columnName] = $column;
     }
 
     public function tableNameByClass(string $className, bool $withPrefix = true): string {
@@ -97,17 +70,13 @@ class EntityManager {
         }
         $primaryKey = [];
         foreach ($this->tableColumns($className) as $columnName => $column) {
-            if ($this->isColumn($column, self::COLUMN_PRIMARY_KEY)) {
+            if ($column->primaryKey) {
                 $primaryKey[] = $columnName;
             }
         }
         $result = empty($primaryKey) ? null : (count($primaryKey) > 1 ? $primaryKey : $primaryKey[0]);
         $this->primaryKeys[$className] = $result;
         return $result;
-    }
-
-    public function isColumn(array $column, string $name): bool {
-        return array_key_exists($name, $column) && $column[$name] === true;
     }
 
     public function primaryKeyValue(string $className, array $data): mixed {
@@ -155,7 +124,7 @@ class EntityManager {
             return false;
         }
         $pkColumn = $this->tableColumns[$className][$pkName];
-        return $this->isColumn($pkColumn, self::COLUMN_AUTO_INCREMENT);
+        return $pkColumn->autoIncrement;
     }
 
     public function safeTableName(string $className, bool $withPrefix = true): string {

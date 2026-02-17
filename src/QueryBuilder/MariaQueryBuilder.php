@@ -88,7 +88,6 @@ class MariaQueryBuilder extends QueryBuilder {
     }
 
     public function columnsByTableDescription(array $data): array {
-        print_r($data);
         return [];
     }
 

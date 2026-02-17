@@ -2,8 +2,6 @@
 
 namespace Dynart\Micro\Entities;
 
-use Dynart\Micro\Micro;
-
 class Query {
 
     const INNER_JOIN = 'inner';
@@ -38,7 +36,7 @@ class Query {
     }
 
     public function fields(): array {
-        return $this->shouldSelectAllFields() ? $this->allFields() : $this->fields;
+        return $this->fields;
     }
 
     public function addVariables(array $variables): void {
@@ -100,11 +98,4 @@ class Query {
         return $this->max;
     }
 
-    private function shouldSelectAllFields(): bool {
-        return empty($this->fields) && is_string($this->from);
-    }
-
-    private function allFields(): array {
-        return array_keys(Micro::get(EntityManager::class)->tableColumns($this->from));
-    }
 }

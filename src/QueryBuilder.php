@@ -98,8 +98,11 @@ abstract class QueryBuilder {
     }
 
     protected function select(Query $query, array $fields = []): string {
-        $selectFields = empty($fields) ? $query->fields() : $fields;
         $queryFrom = $query->from();
+        $selectFields = $fields ?: $query->fields();
+        if (empty($selectFields) && is_string($queryFrom)) {
+            $selectFields = array_keys($this->em->tableColumns($queryFrom));
+        }
         if (is_subclass_of($queryFrom, Query::class)) {
             self::$subQueryCounter++; // TODO: better solution?
             $from = '('.$this->findAll($queryFrom, []).') S'.self::$subQueryCounter;

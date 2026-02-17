@@ -155,14 +155,15 @@ class EntityManager {
         return $result;
     }
 
-    public function deleteById(string $className, int $id): void {
-        $sql = "delete from {$this->safeTableName($className)} where id = :id limit 1";
-        $this->db->query($sql, [':id' => $id]);
+    public function deleteById(string $className, mixed $id): void {
+        $sql = "delete from {$this->safeTableName($className)} where {$this->primaryKeyCondition($className)} limit 1";
+        $this->db->query($sql, $this->primaryKeyConditionParams($className, $id));
     }
 
     public function deleteByIds(string $className, array $ids): void {
+        $safePk = $this->db->escapeName($this->primaryKey($className));
         [$condition, $params] = $this->db->getInConditionAndParams($ids);
-        $sql = "delete from {$this->safeTableName($className)} where id in ($condition)";
+        $sql = "delete from {$this->safeTableName($className)} where $safePk in ($condition)";
         $this->db->query($sql, $params);
     }
 
@@ -198,7 +199,7 @@ class EntityManager {
         $className = get_class($entity);
         $columnKeys = array_keys($this->tableColumns($className));
         foreach ($data as $n => $v) {
-            if (!array_key_exists($n, $columnKeys)) {
+            if (!in_array($n, $columnKeys)) {
                 throw new EntityManagerException("Column '$n' doesn't exist in $className");
             }
             $entity->$n = $v;

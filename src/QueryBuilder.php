@@ -25,6 +25,7 @@ abstract class QueryBuilder {
     abstract public function indexDefinition(?string $name, array $columns): string;
     abstract public function dropTable(string $safeTableName, bool $ifExists): string;
     abstract public function renameTable(string $safeFromName, string $safeToName): string;
+    abstract public function addForeignKey(string $safeTableName, string $definition): string;
     abstract public function isTableExist(string $dbNameParam, string $tableNameParam): string;
     abstract public function listTables(): string;
     abstract public function describeTable(string $className): string;
@@ -168,6 +169,27 @@ abstract class QueryBuilder {
 
     public function dropAuditTableByClass(string $className, bool $ifExists = true): string {
         return $this->dropTable($this->em->safeAuditTableName($className), $ifExists);
+    }
+
+    /**
+     * Adds a foreign key that could not be declared when the table was created
+     *
+     * A `CREATE TABLE` can only reference a table that already exists, so a reference to an
+     * entity introduced later has to be added afterwards. The definition comes from the same
+     * `#[Column]` metadata as the inline one, so the two cannot drift.
+     */
+    public function addForeignKeyByColumn(string $className, string $columnName): string {
+        $columns = $this->em->tableColumns($className);
+        if (!array_key_exists($columnName, $columns)) {
+            throw new EntityManagerException("There is no column '$columnName' in $className.");
+        }
+        $this->currentClassNameForException = $className;
+        $this->currentColumnNameForException = $columnName;
+        $definition = $this->foreignKeyDefinition($columnName, $columns[$columnName]);
+        if ($definition === '') {
+            throw new EntityManagerException("$className::\$$columnName has no foreign key to add.");
+        }
+        return $this->addForeignKey($this->em->safeTableName($className), $definition);
     }
 
     // TODO: public function findAllUnion(array $queries): string

@@ -54,6 +54,10 @@ class MariaQueryBuilder extends QueryBuilder {
         return 'rename table '.$safeFromName.' to '.$safeToName;
     }
 
+    public function addForeignKey(string $safeTableName, string $definition): string {
+        return 'alter table '.$safeTableName.' add '.$definition;
+    }
+
     public function foreignKeyDefinition(string $columnName, Column $column): string {
         if ($column->foreignKey === null) {
             return '';

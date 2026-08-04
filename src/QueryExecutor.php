@@ -81,6 +81,15 @@ class QueryExecutor {
         ));
     }
 
+    /**
+     * Adds a foreign key to an existing table
+     *
+     * For a column that references an entity introduced after its own table was created.
+     */
+    public function addForeignKey(string $className, string $columnName): void {
+        $this->db->query($this->queryBuilder->addForeignKeyByColumn($className, $columnName));
+    }
+
     public function listTables(): array {
         $sql = $this->queryBuilder->listTables();
         return $this->db->fetchColumn($sql);

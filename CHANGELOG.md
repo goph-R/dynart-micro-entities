@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.6.0] &ndash; 2026-08-04
+
+### Added
+- `QueryBuilder::addForeignKey()` / `addForeignKeyByColumn()` and `QueryExecutor::addForeignKey()` — adds a foreign key to an existing table, for a column that references an entity introduced after its own table was created. The definition comes from the same `#[Column]` metadata as the inline one, so the two cannot drift.
+
+---
+
 ## [0.5.0] &ndash; 2026-08-04
 
 ### Fixed

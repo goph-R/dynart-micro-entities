@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.3.1] &ndash; 2026-08-04
+
+### Fixed
+- **`Migrations::add()` did not register the migration in the DI container**, but `run()` resolves migrations through it — so every real caller had to remember a second `Micro::add()` or the run died with "was not added". `add()` now registers the class itself, the same thing `AbstractApp::addMiddleware()` does for middlewares. The 0.3.0 tests hid this by registering the classes by hand; they no longer do.
+
+---
+
 ## [0.3.0] &ndash; 2026-08-04
 
 ### Added

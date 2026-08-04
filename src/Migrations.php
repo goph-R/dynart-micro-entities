@@ -41,15 +41,22 @@ class Migrations {
     /**
      * Registers a migration class
      *
+     * Also registers it in the DI container, because the runner resolves migrations through it -
+     * the same thing `AbstractApp::addMiddleware()` does for middlewares.
+     *
      * @throws EntityManagerException if the class does not implement MigrationInterface
      */
     public function add(string $className): void {
         if (!is_subclass_of($className, MigrationInterface::class)) {
             throw new EntityManagerException("$className doesn't implement the MigrationInterface");
         }
-        if (!in_array($className, $this->migrationClasses)) {
-            $this->migrationClasses[] = $className;
+        if (in_array($className, $this->migrationClasses)) {
+            return;
         }
+        if (!Micro::hasInterface($className)) {
+            Micro::add($className);
+        }
+        $this->migrationClasses[] = $className;
     }
 
     /**

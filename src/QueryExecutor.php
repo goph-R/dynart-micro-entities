@@ -57,6 +57,30 @@ class QueryExecutor {
         $this->db->query($this->queryBuilder->dropAuditTableByClass($className, $ifExists));
     }
 
+    /**
+     * Is there a table with this exact name?
+     *
+     * Takes a raw name rather than a class, for a migration that has to look for a table the
+     * entities no longer describe - the one they were called before a rename, say.
+     */
+    public function isTableNameExist(string $tableName): bool {
+        $result = $this->db->fetchOne($this->queryBuilder->isTableExist(':dbName', ':tableName'), [
+            ':dbName'    => $this->db->configValue('name'),
+            ':tableName' => $tableName
+        ]);
+        return (bool)$result;
+    }
+
+    /**
+     * Renames a table, by raw names for the same reason
+     */
+    public function renameTable(string $fromName, string $toName): void {
+        $this->db->query($this->queryBuilder->renameTable(
+            $this->db->escapeName($fromName),
+            $this->db->escapeName($toName)
+        ));
+    }
+
     public function listTables(): array {
         $sql = $this->queryBuilder->listTables();
         return $this->db->fetchColumn($sql);

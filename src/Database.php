@@ -16,6 +16,9 @@ abstract class Database
     protected bool $connected = false;
     protected ?PDO $pdo = null;
 
+    /** Set by `EntityManager`, so `#ClassName` honours a `#[Table(name: ...)]` override */
+    protected mixed $tableNameResolver = null;
+
     abstract protected function connect(): void;
     abstract public function escapeName(string $name): string;
     abstract public function escapeLike(string $string): string;
@@ -53,15 +56,32 @@ abstract class Database
         return $stmt;
     }
 
+    /**
+     * Resolves a `#ClassName` token to a table name, when one is set
+     *
+     * `EntityManager` registers itself here, so a `#[Table(name: 'user_role')]` override is
+     * honoured. Without it the substitution would compute the name itself and quietly disagree
+     * with the entity metadata for every renamed table.
+     */
+    public function setTableNameResolver(?callable $resolver): void {
+        $this->tableNameResolver = $resolver;
+    }
+
     protected function replaceClassHashNamesWithTableNames(string $query): string {
         return preg_replace_callback(
             '/(\'[^\'"#]*\')|(#[A-Za-z0-9_]+(?=[\s\n\r\.`]|$))/',
             function ($matches) {
                 if ($matches[1]) {
                     return $matches[1]; // Keep content within single quotes unchanged
-                } else {
-                    return $this->configValue('table_prefix').strtolower(substr($matches[0], 1));
                 }
+                $name = substr($matches[0], 1);
+                if ($this->tableNameResolver !== null) {
+                    $resolved = call_user_func($this->tableNameResolver, $name);
+                    if (is_string($resolved) && $resolved !== '') {
+                        return $resolved;
+                    }
+                }
+                return $this->configValue('table_prefix').strtolower($name);
             },
             $query
         );

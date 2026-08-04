@@ -32,6 +32,9 @@ class EntityManager {
     protected array $tableNames = [];
     protected array $tables = [];
     protected array $auditable = [];
+
+    /** Cache for `tableNameByShortName()`, in [short class name => table name] format */
+    protected array $shortNames = [];
     protected array $primaryKeys = [];
     protected string $tableNamePrefix = '';
     protected bool $useEntityHashName = false;
@@ -42,6 +45,33 @@ class EntityManager {
         protected EventServiceInterface $events,
     ) {
         $this->tableNamePrefix = $db->configValue('table_prefix');
+        $db->setTableNameResolver([$this, 'tableNameByShortName']);
+    }
+
+    /**
+     * Resolves a `#ClassName` token from raw SQL to the registered table name
+     *
+     * Matches on the short class name, because that is all a `#ClassName` token carries. Two
+     * entities with the same short name in different namespaces are ambiguous, and the first
+     * registered wins - write those tables out with `safeTableName()` instead.
+     *
+     * @return string|null null when nothing is registered under that name, so the caller can
+     *                     fall back to its own naming
+     */
+    public function tableNameByShortName(string $shortName): ?string {
+        if ($this->useEntityHashName) {
+            return null; // in hash name mode the stored names are the tokens themselves
+        }
+        if (array_key_exists($shortName, $this->shortNames)) {
+            return $this->shortNames[$shortName];
+        }
+        foreach (array_keys($this->tableNames) as $className) {
+            if ($this->simpleClassName($className) === $shortName) {
+                $this->shortNames[$shortName] = $this->tableNames[$className];
+                return $this->shortNames[$shortName];
+            }
+        }
+        return null;
     }
 
     public function setUseEntityHashName(bool $value): void {
@@ -64,6 +94,7 @@ class EntityManager {
      */
     public function addTable(string $className, Table $table): void {
         $this->tables[$className] = $table;
+        $this->shortNames = []; // the attribute may rename the table, so the cache is stale
         if (array_key_exists($className, $this->tableNames)) {
             $this->tableNames[$className] = $this->tableNameByClass($className);
         }

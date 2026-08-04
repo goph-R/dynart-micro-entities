@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.5.0] &ndash; 2026-08-04
+
+### Fixed
+- **`#ClassName` substitution ignored `#[Table(name: ...)]`.** It computed `prefix + strtolower(ClassName)` itself, so `#UserRole` resolved to `prefix_userrole` while the entity's declared table was `prefix_user_role` — raw SQL silently queried a table that did not exist. `EntityManager` now registers itself as the resolver, so the attribute is honoured; an unknown token still falls back to the derived name.
+
+### Added
+- `EntityManager::tableNameByShortName()` — resolves a `#ClassName` token to the registered table name, cached
+- `Database::setTableNameResolver()`
+- `QueryBuilder::renameTable()` and `QueryExecutor::renameTable()` / `isTableNameExist()` — the complement of `dropTable()`, and what a rename migration needs
+- `Revision` and `MigrationHistory` declare their own table names (`revision`, `migration_history`) rather than relying on the derived one
+
+### Notes
+- Table names are **declared, never derived from CamelCase**. A guess eventually disagrees with what somebody wanted, and the disagreement is silent.
+
+---
+
 ## [0.4.1] &ndash; 2026-08-04
 
 ### Fixed

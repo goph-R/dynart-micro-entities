@@ -50,6 +50,10 @@ class MariaQueryBuilder extends QueryBuilder {
         return 'drop table '.($ifExists ? 'if exists ' : '').$safeTableName;
     }
 
+    public function renameTable(string $safeFromName, string $safeToName): string {
+        return 'rename table '.$safeFromName.' to '.$safeToName;
+    }
+
     public function foreignKeyDefinition(string $columnName, Column $column): string {
         if ($column->foreignKey === null) {
             return '';

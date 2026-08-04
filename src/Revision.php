@@ -3,6 +3,7 @@
 namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\Entities\Attribute\Column;
+use Dynart\Micro\Entities\Attribute\Table;
 
 /**
  * One unit of change
@@ -11,6 +12,7 @@ use Dynart\Micro\Entities\Attribute\Column;
  * Revisions are kept forever, which is why `created_at` is indexed: history is queried by time
  * far more often than by anything else, and the table only ever grows.
  */
+#[Table(name: 'revision')]
 class Revision extends Entity {
 
     protected static string $eventName = 'revision';

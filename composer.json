@@ -2,7 +2,7 @@
     "name": "dynart/micro-entities",
     "description": "Entity manager for Micro",
     "type": "library",
-    "version": "0.4.1",
+    "version": "0.5.0",
     "license": "MIT",
     "autoload": {
         "psr-4": {

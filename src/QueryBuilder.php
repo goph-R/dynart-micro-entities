@@ -24,6 +24,7 @@ abstract class QueryBuilder {
     abstract public function uniqueDefinition(?string $name, array $columns): string;
     abstract public function indexDefinition(?string $name, array $columns): string;
     abstract public function dropTable(string $safeTableName, bool $ifExists): string;
+    abstract public function renameTable(string $safeFromName, string $safeToName): string;
     abstract public function isTableExist(string $dbNameParam, string $tableNameParam): string;
     abstract public function listTables(): string;
     abstract public function describeTable(string $className): string;

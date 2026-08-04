@@ -23,7 +23,7 @@ php vendor/bin/phpunit --stderr
 
 `Database` (abstract) → `MariaDatabase` (MySQL/MariaDB). Wraps PDO with lazy connection, prepared statements, logging, and transaction support. `PdoBuilder` constructs PDO instances via fluent API.
 
-Key feature: `#ClassName` tokens in SQL are replaced with `<prefix>classname` (outside string literals). Example: `#User` → `app_user`.
+Key feature: `#ClassName` tokens in SQL are replaced with the registered table name (outside string literals). Example: `#User` → `app_user`. `EntityManager` registers itself as the resolver, so a `#[Table(name: 'user_role')]` override is honoured — without that the substitution would compute `app_userrole` and silently query a table that does not exist. A token that matches no entity falls back to `<prefix>classname`.
 
 Config keys use the pattern `database.{configName}.{key}` (default config name is `"default"`).
 
@@ -40,7 +40,7 @@ Config keys use the pattern `database.{configName}.{key}` (default config name i
 
 `ColumnAttributeHandler` — implements `AttributeHandlerInterface`; reads `#[Column]` attributes via reflection and calls `EntityManager::addColumn()`. Registered via dynart-micro's `AttributeProcessor` middleware.
 
-`#[Table]` (PHP 8 attribute on Entity classes) — table-level metadata: an override for the table `name`, plus composite `unique` constraints and multi-column `index`es that cannot be expressed per-property. Single-column constraints belong on `#[Column(unique: true)]` / `#[Column(index: true)]`.
+`#[Table]` (PHP 8 attribute on Entity classes) — table-level metadata: the table `name` (**declare it, it is never derived from CamelCase** — a guess eventually disagrees with what was wanted, silently), plus composite `unique` constraints and multi-column `index`es that cannot be expressed per-property. Single-column constraints belong on `#[Column(unique: true)]` / `#[Column(index: true)]`.
 
 `#[Auditable]` (PHP 8 attribute on Entity classes) — marks an entity for history. See *Auditing* below.
 

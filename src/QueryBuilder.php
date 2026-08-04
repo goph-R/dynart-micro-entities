@@ -19,10 +19,11 @@ abstract class QueryBuilder {
     protected int $maxLimit;
 
     abstract public function columnDefinition(string $columnName, Column $column): string;
-    abstract public function primaryKeyDefinition(string $className): string;
+    abstract public function primaryKeyColumnsDefinition(array $columnNames): string;
     abstract public function foreignKeyDefinition(string $columnName, Column $column): string;
     abstract public function uniqueDefinition(?string $name, array $columns): string;
     abstract public function indexDefinition(?string $name, array $columns): string;
+    abstract public function dropTable(string $safeTableName, bool $ifExists): string;
     abstract public function isTableExist(string $dbNameParam, string $tableNameParam): string;
     abstract public function listTables(): string;
     abstract public function describeTable(string $className): string;
@@ -37,26 +38,103 @@ abstract class QueryBuilder {
     }
 
     public function createTable(string $className, bool $ifNotExists = false): string {
+        return $this->buildCreateTable(
+            $className,
+            $this->em->safeTableName($className),
+            $this->em->tableColumns($className),
+            $this->em->primaryKeyColumns($className),
+            $this->em->uniqueConstraints($className),
+            $this->em->indexes($className),
+            true,
+            $ifNotExists
+        );
+    }
+
+    /**
+     * Generates the CREATE TABLE of the audit mirror of an entity
+     *
+     * The mirror holds one full copy of the row per change, so it differs from the source table
+     * in four ways:
+     *
+     * - the primary key is widened with the revision id, since the same row appears many times
+     * - unique constraints are dropped, for the same reason
+     * - foreign keys are dropped, because history has to survive the deletion of what it refers to
+     * - auto increment is dropped, the values are copied from the source row
+     */
+    public function createAuditTable(string $className, bool $ifNotExists = false): string {
+        return $this->buildCreateTable(
+            $className,
+            $this->em->safeAuditTableName($className),
+            $this->auditColumns($className),
+            array_merge($this->em->primaryKeyColumns($className), [EntityManager::AUDIT_REVISION_COLUMN]),
+            [],
+            $this->em->indexes($className),
+            false,
+            $ifNotExists
+        );
+    }
+
+    /**
+     * Derives the columns of an audit mirror table from the columns of the source table
+     *
+     * @return Column[]
+     */
+    protected function auditColumns(string $className): array {
+        $result = [];
+        foreach ($this->em->tableColumns($className) as $columnName => $column) {
+            $auditColumn = clone $column;
+            $auditColumn->autoIncrement = false;
+            $auditColumn->unique = false;
+            $auditColumn->foreignKey = null;
+            $auditColumn->onDelete = null;
+            $auditColumn->onUpdate = null;
+            $result[$columnName] = $auditColumn;
+        }
+        $result[EntityManager::AUDIT_REVISION_COLUMN] = new Column(
+            type: Column::TYPE_LONG, notNull: true, primaryKey: true
+        );
+        $result[EntityManager::AUDIT_TYPE_COLUMN] = new Column(
+            type: Column::TYPE_STRING, size: 3, fixSize: true, notNull: true
+        );
+        return $result;
+    }
+
+    /**
+     * @param Column[] $columns
+     * @param string[] $primaryKeyColumns
+     */
+    protected function buildCreateTable(
+        string $className,
+        string $safeTableName,
+        array $columns,
+        array $primaryKeyColumns,
+        array $uniqueConstraints,
+        array $indexes,
+        bool $withForeignKeys,
+        bool $ifNotExists
+    ): string {
         $this->currentClassNameForException = $className;
         $allColumnDef = [];
         $allForeignKeyDef = [];
-        foreach ($this->em->tableColumns($className) as $columnName => $column) {
+        foreach ($columns as $columnName => $column) {
             $this->currentColumnNameForException = $columnName;
             $allColumnDef[] = self::INDENTATION . $this->columnDefinition($columnName, $column);
+            if (!$withForeignKeys) {
+                continue;
+            }
             $foreignKeyDef = $this->foreignKeyDefinition($columnName, $column);
             if ($foreignKeyDef) {
                 $allForeignKeyDef[] = self::INDENTATION . $foreignKeyDef;
             }
         }
-        $primaryKeyDef = $this->primaryKeyDefinition($className);
+        $primaryKeyDef = $this->primaryKeyColumnsDefinition($primaryKeyColumns);
         $allConstraintDef = [];
-        foreach ($this->em->uniqueConstraints($className) as $unique) {
+        foreach ($uniqueConstraints as $unique) {
             $allConstraintDef[] = self::INDENTATION . $this->uniqueDefinition($unique['name'], $unique['columns']);
         }
-        foreach ($this->em->indexes($className) as $index) {
+        foreach ($indexes as $index) {
             $allConstraintDef[] = self::INDENTATION . $this->indexDefinition($index['name'], $index['columns']);
         }
-        $safeTableName = $this->em->safeTableName($className);
         $result = "create table ";
         if ($ifNotExists) {
             $result .= "if not exists ";
@@ -74,6 +152,21 @@ abstract class QueryBuilder {
         }
         $result .= "\n)";
         return $result;
+    }
+
+    /**
+     * Keeps the class based signature for the common case
+     */
+    public function primaryKeyDefinition(string $className): string {
+        return $this->primaryKeyColumnsDefinition($this->em->primaryKeyColumns($className));
+    }
+
+    public function dropTableByClass(string $className, bool $ifExists = true): string {
+        return $this->dropTable($this->em->safeTableName($className), $ifExists);
+    }
+
+    public function dropAuditTableByClass(string $className, bool $ifExists = true): string {
+        return $this->dropTable($this->em->safeAuditTableName($className), $ifExists);
     }
 
     // TODO: public function findAllUnion(array $queries): string

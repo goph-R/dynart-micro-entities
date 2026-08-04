@@ -4,14 +4,34 @@ namespace Dynart\Micro\Entities;
 
 use Dynart\Micro\ConfigInterface;
 use Dynart\Micro\EventServiceInterface;
+use Dynart\Micro\Entities\Attribute\Auditable;
 use Dynart\Micro\Entities\Attribute\Column;
 use Dynart\Micro\Entities\Attribute\Table;
 
 class EntityManager {
 
+    /** The suffix of the audit mirror tables */
+    const AUDIT_TABLE_SUFFIX = '_aud';
+
+    /** The revision id column of the audit tables */
+    const AUDIT_REVISION_COLUMN = 'rev_id';
+
+    /** The change kind column of the audit tables */
+    const AUDIT_TYPE_COLUMN = 'rev_type';
+
+    /** `save()` inserted a new row */
+    const OPERATION_INSERT = 'insert';
+
+    /** `save()` updated an existing row */
+    const OPERATION_UPDATE = 'update';
+
+    /** `save()` had nothing to write because no field was dirty */
+    const OPERATION_NONE = 'none';
+
     protected array $tableColumns = [];
     protected array $tableNames = [];
     protected array $tables = [];
+    protected array $auditable = [];
     protected array $primaryKeys = [];
     protected string $tableNamePrefix = '';
     protected bool $useEntityHashName = false;
@@ -51,6 +71,71 @@ class EntityManager {
 
     public function table(string $className): ?Table {
         return $this->tables[$className] ?? null;
+    }
+
+    /**
+     * Registers an entity by reading its attributes with reflection
+     *
+     * The attribute processor middleware does this for the application's own entities. This is
+     * for the ones that come from a library, like `Revision`, and for tests.
+     */
+    public function registerEntity(string $className): void {
+        $ref = new \ReflectionClass($className);
+        foreach ($ref->getAttributes(Table::class) as $attribute) {
+            $this->addTable($className, $attribute->newInstance());
+        }
+        foreach ($ref->getAttributes(Auditable::class) as $ignored) {
+            $this->setAuditable($className);
+        }
+        foreach ($ref->getProperties() as $property) {
+            foreach ($property->getAttributes(Column::class) as $attribute) {
+                $this->addColumn($className, $property->getName(), $attribute->newInstance());
+            }
+        }
+    }
+
+    /**
+     * Marks an entity as auditable
+     */
+    public function setAuditable(string $className): void {
+        if (!in_array($className, $this->auditable)) {
+            $this->auditable[] = $className;
+        }
+    }
+
+    public function isAuditable(string $className): bool {
+        return in_array($className, $this->auditable);
+    }
+
+    /**
+     * @return string[] The class names of every auditable entity
+     */
+    public function auditableClasses(): array {
+        return $this->auditable;
+    }
+
+    /**
+     * Returns with the name of the audit mirror table of an entity
+     */
+    public function auditTableName(string $className): string {
+        return $this->tableName($className).self::AUDIT_TABLE_SUFFIX;
+    }
+
+    public function safeAuditTableName(string $className): string {
+        return $this->db->escapeName($this->tableNameByClass($className).self::AUDIT_TABLE_SUFFIX);
+    }
+
+    /**
+     * Returns with the primary key column names as a list, empty when there is no primary key
+     *
+     * @return string[]
+     */
+    public function primaryKeyColumns(string $className): array {
+        $primaryKey = $this->primaryKey($className);
+        if ($primaryKey === null) {
+            return [];
+        }
+        return is_array($primaryKey) ? $primaryKey : [$primaryKey];
     }
 
     public function tableNameByClass(string $className, bool $withPrefix = true): string {
@@ -307,11 +392,20 @@ class EntityManager {
         $entity->clearSnapshot();
     }
 
+    /**
+     * Inserts or updates an entity
+     *
+     * The after save event carries the operation that actually happened as its second argument,
+     * one of the `OPERATION_*` constants. An auditing listener can not work it out afterwards:
+     * once the row is written the entity is neither new nor dirty either way, and a save with no
+     * dirty field writes nothing at all.
+     */
     public function save(Entity $entity): void {
         $this->events->emit($entity->beforeSaveEvent(), [$entity]);
         $className = get_class($entity);
         $tableName = $this->tableName($className);
         $data = $this->fetchDataArray($entity);
+        $operation = self::OPERATION_NONE;
         if ($entity->isNew()) {
             $this->db->insert($tableName, $data);
             if ($this->isPrimaryKeyAutoIncrement($className)) {
@@ -321,6 +415,7 @@ class EntityManager {
             }
             $entity->setNew(false);
             $entity->takeSnapshot($data);
+            $operation = self::OPERATION_INSERT;
         } else {
             $dirtyData = $entity->getDirtyFields($data);
             if ($dirtyData !== []) {
@@ -330,9 +425,10 @@ class EntityManager {
                     $this->primaryKeyConditionParams($className, $this->primaryKeyValue($className, $data))
                 );
                 $entity->takeSnapshot($data);
+                $operation = self::OPERATION_UPDATE;
             }
         }
-        $this->events->emit($entity->afterSaveEvent(), [$entity]);
+        $this->events->emit($entity->afterSaveEvent(), [$entity, $operation]);
     }
 
     public function setByDataArray(Entity $entity, array $data): void {

@@ -35,24 +35,19 @@ class MariaQueryBuilder extends QueryBuilder {
         return join(' ', $parts);
     }
 
-    public function primaryKeyDefinition(string $className): string {
-        $result = '';
-        $primaryKey = $this->em->primaryKey($className);
-        if (!$primaryKey) {
-            return $result;
+    public function primaryKeyColumnsDefinition(array $columnNames): string {
+        if (empty($columnNames)) {
+            return '';
         }
-        $result = 'primary key (';
-        if (is_array($primaryKey)) {
-            $pks = [];
-            foreach ($primaryKey as $pk) {
-                $pks[] = $this->db->escapeName($pk);
-            }
-            $result .= join(', ', $pks);
-        } else {
-            $result .= $this->db->escapeName($primaryKey);
+        $safe = [];
+        foreach ($columnNames as $columnName) {
+            $safe[] = $this->db->escapeName($columnName);
         }
-        $result .= ')';
-        return $result;
+        return 'primary key ('.join(', ', $safe).')';
+    }
+
+    public function dropTable(string $safeTableName, bool $ifExists = true): string {
+        return 'drop table '.($ifExists ? 'if exists ' : '').$safeTableName;
     }
 
     public function foreignKeyDefinition(string $columnName, Column $column): string {

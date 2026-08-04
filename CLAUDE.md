@@ -42,11 +42,42 @@ Config keys use the pattern `database.{configName}.{key}` (default config name i
 
 `#[Table]` (PHP 8 attribute on Entity classes) — table-level metadata: an override for the table `name`, plus composite `unique` constraints and multi-column `index`es that cannot be expressed per-property. Single-column constraints belong on `#[Column(unique: true)]` / `#[Column(index: true)]`.
 
-`TableAttributeHandler` — the `TARGET_CLASS` counterpart of `ColumnAttributeHandler`; register both with the `AttributeProcessor` middleware.
+`#[Auditable]` (PHP 8 attribute on Entity classes) — marks an entity for history. See *Auditing* below.
+
+`TableAttributeHandler` / `AuditableAttributeHandler` — the `TARGET_CLASS` counterparts of `ColumnAttributeHandler`; register all three with the `AttributeProcessor` middleware.
+
+`EntityManager::registerEntity()` — reflection-based registration of one entity (`#[Table]`, `#[Auditable]`, then `#[Column]`), for library-provided entities like `Revision` that the application's namespace scan does not cover, and for tests.
 
 `EntityManager` — central registry (`className → [columnName → Column]`). Handles `save` (insert/update with dirty tracking), `findById`, `findByIds`, `deleteById`, `deleteByIds`, `insert`, `update`, `fetchDataArray`, `setByDataArray`, plus `table`, `uniqueConstraints` and `indexes` for the schema metadata. Emits before/after save **and delete** events via `EventServiceInterface`.
 
 **`deleteById()` / `deleteByIds()` load before deleting.** The delete events have to carry the row's previous state (an auditing listener has no other way to get it), so both methods select the affected entities first and emit per entity. `findById()` returns `null` for a missing row rather than fataling on a `false` from PDO.
+
+### Auditing
+
+`#[Auditable]` on an entity gives it a mirror table named `<table>_aud`. `AuditService` subscribes to that entity's after-save and after-delete events and copies the full row in, tagged with a revision id and `rev_type` (`add` / `mod` / `del`).
+
+The mirror is **derived** from the source `#[Column]` metadata, differing in four deliberate ways:
+
+- the primary key is widened with `rev_id` — the same row appears once per revision
+- unique constraints are dropped — same reason
+- foreign keys are dropped — history must survive the deletion of what it references
+- auto-increment is dropped — values are copied from the source row
+
+**One row per entity per revision.** All changes in a request share one revision, created lazily on the first write. Changing the same entity twice inside one revision *overwrites* its earlier row rather than adding a second (`AuditService` deletes then inserts, keeping it portable) — the row holds the entity's state at the end of the revision. Call `reset()` to start a new revision when the individual steps matter.
+
+**Revisions are kept forever.** `Revision.created_at` and `user_id` are both indexed, since the table only grows and history is queried by time.
+
+`EntityManager::save()` emits its after-save event with the operation (`OPERATION_INSERT` / `OPERATION_UPDATE` / `OPERATION_NONE`) as a **second argument** — a listener cannot work it out afterwards, because once the row is written the entity is neither new nor dirty either way, and a save with no dirty field writes nothing at all.
+
+Wiring: `AuditService::subscribeAll()` must run *after* the attribute processor. `postConstruct()` hooks it to `app:init_finished`, so an application only has to register and instantiate the service.
+
+### Migrations
+
+`MigrationInterface` — `version()` (unique, sortable) and `up()`. Migrations are resolved through the DI container, so they can inject `QueryExecutor` and friends.
+
+`Migrations` — register classes with `add()`, then `run()` applies every pending one in ascending version order and records it in the `MigrationHistory` table. The registry is open so plugins can add their own; versions interleave by sort order.
+
+There is **no `down()`** — a mistake is corrected by a new migration. Each migration is recorded as soon as it succeeds, so a failure part-way leaves the earlier ones applied and the run can be repeated. Wrapping the run in a transaction would not help: DDL commits implicitly in MariaDB.
 
 ### Query System
 

@@ -18,9 +18,43 @@ class QueryExecutor {
         return (bool)$result;
     }
 
+    public function isAuditTableExist(string $className): bool {
+        $result = $this->db->fetchOne($this->queryBuilder->isTableExist(':dbName', ':tableName'), [
+            ':dbName'    => $this->db->configValue('name'),
+            ':tableName' => $this->em->tableNameByClass($className).EntityManager::AUDIT_TABLE_SUFFIX
+        ]);
+        return (bool)$result;
+    }
+
     public function createTable(string $className, bool $ifNotExists = false): void {
         $sql = $this->queryBuilder->createTable($className, $ifNotExists);
         $this->db->query($sql);
+    }
+
+    /**
+     * Creates the audit mirror table of an entity
+     */
+    public function createAuditTable(string $className, bool $ifNotExists = false): void {
+        $sql = $this->queryBuilder->createAuditTable($className, $ifNotExists);
+        $this->db->query($sql);
+    }
+
+    /**
+     * Creates the table of an entity and, when it is auditable, its audit mirror as well
+     */
+    public function createTableWithAudit(string $className, bool $ifNotExists = false): void {
+        $this->createTable($className, $ifNotExists);
+        if ($this->em->isAuditable($className)) {
+            $this->createAuditTable($className, $ifNotExists);
+        }
+    }
+
+    public function dropTable(string $className, bool $ifExists = true): void {
+        $this->db->query($this->queryBuilder->dropTableByClass($className, $ifExists));
+    }
+
+    public function dropAuditTable(string $className, bool $ifExists = true): void {
+        $this->db->query($this->queryBuilder->dropAuditTableByClass($className, $ifExists));
     }
 
     public function listTables(): array {

@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.4.0] &ndash; 2026-08-04
+
+### Changed
+- **`Query::addVariables()` refuses to rebind a name to a different value.** It merged with `array_merge`, so two contributors both using `:id` silently shared one value — the SQL keeps both occurrences of the placeholder, the last write won, and the other condition filtered on the wrong thing. Rebinding the *same* value is still allowed, because writing `(a = :id) or (b = :id)` as two conditions is normal. Only a conflict throws, so the failure can never be silent.
+
+### Added
+- `Query::nextParamName($base)` — returns a bound variable name that is not in use yet (`:base_0`, `:base_1`, …), for a contributor that does not know what else is already on the query
+
+---
+
 ## [0.3.1] &ndash; 2026-08-04
 
 ### Fixed

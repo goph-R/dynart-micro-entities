@@ -39,8 +39,48 @@ class Query {
         return $this->fields;
     }
 
+    /**
+     * Adds bound variables to the query
+     *
+     * Binding the same name twice to the same value is allowed, because writing
+     * `(a = :id) or (b = :id)` as two conditions is a normal thing to do. Binding it to a
+     * *different* value is refused: the SQL keeps both occurrences of the placeholder, so the
+     * last write would silently win and the other condition would filter on the wrong value.
+     * That never happens while one author owns a query, and becomes a matter of time once
+     * plugins attach conditions to queries they did not write.
+     *
+     * @throws EntityManagerException if a name is already bound to a different value
+     */
     public function addVariables(array $variables): void {
-        $this->variables = array_merge($this->variables, $variables);
+        foreach ($variables as $name => $value) {
+            if (array_key_exists($name, $this->variables) && $this->variables[$name] !== $value) {
+                throw new EntityManagerException(
+                    "The query variable '$name' is already bound to a different value."
+                    ." Use nextParamName() to get a name that is free."
+                );
+            }
+            $this->variables[$name] = $value;
+        }
+    }
+
+    /**
+     * Returns with a bound variable name that is not in use yet
+     *
+     * For contributors that do not know what else is on the query - a plugin adding a condition
+     * to a query somebody else built:
+     *
+     * <pre>
+     * $name = $query->nextParamName('author');   // ':author_0'
+     * $query->addCondition("`author_id` = $name", [$name => 12]);
+     * </pre>
+     */
+    public function nextParamName(string $base): string {
+        $base = ltrim($base, ':');
+        $index = 0;
+        while (array_key_exists(':'.$base.'_'.$index, $this->variables)) {
+            $index++;
+        }
+        return ':'.$base.'_'.$index;
     }
 
     public function variables(): array {

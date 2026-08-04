@@ -5,11 +5,13 @@ namespace Dynart\Micro\Entities;
 use Dynart\Micro\ConfigInterface;
 use Dynart\Micro\EventServiceInterface;
 use Dynart\Micro\Entities\Attribute\Column;
+use Dynart\Micro\Entities\Attribute\Table;
 
 class EntityManager {
 
     protected array $tableColumns = [];
     protected array $tableNames = [];
+    protected array $tables = [];
     protected array $primaryKeys = [];
     protected string $tableNamePrefix = '';
     protected bool $useEntityHashName = false;
@@ -34,12 +36,68 @@ class EntityManager {
         $this->tableColumns[$className][$columnName] = $column;
     }
 
-    public function tableNameByClass(string $className, bool $withPrefix = true): string {
-        $simpleClassName = $this->simpleClassName($className);
-        if ($this->useEntityHashName) {
-            return '#'.$simpleClassName;
+    /**
+     * Registers the table level metadata of an entity
+     *
+     * The attribute processor handles class level attributes before the property level ones, but
+     * the cached table name is refreshed anyway so the order can not matter.
+     */
+    public function addTable(string $className, Table $table): void {
+        $this->tables[$className] = $table;
+        if (array_key_exists($className, $this->tableNames)) {
+            $this->tableNames[$className] = $this->tableNameByClass($className);
         }
-        return ($withPrefix ? $this->tableNamePrefix : '').strtolower($simpleClassName);
+    }
+
+    public function table(string $className): ?Table {
+        return $this->tables[$className] ?? null;
+    }
+
+    public function tableNameByClass(string $className, bool $withPrefix = true): string {
+        $table = $this->tables[$className] ?? null;
+        $name = $table !== null && $table->name ? $table->name : $this->simpleClassName($className);
+        if ($this->useEntityHashName) {
+            return '#'.$name;
+        }
+        return ($withPrefix ? $this->tableNamePrefix : '').strtolower($name);
+    }
+
+    /**
+     * Returns with the unique constraints of a table
+     *
+     * Merges the single column ones declared with `#[Column(unique: true)]` and the composite
+     * ones declared with `#[Table(unique: [...])]`.
+     *
+     * @return array A list of ['name' => ?string, 'columns' => string[]]
+     */
+    public function uniqueConstraints(string $className): array {
+        return $this->constraints($className, 'unique');
+    }
+
+    /**
+     * Returns with the indexes of a table
+     *
+     * @see uniqueConstraints()
+     * @return array A list of ['name' => ?string, 'columns' => string[]]
+     */
+    public function indexes(string $className): array {
+        return $this->constraints($className, 'index');
+    }
+
+    protected function constraints(string $className, string $kind): array {
+        $result = [];
+        foreach ($this->tableColumns($className) as $columnName => $column) {
+            if ($column->$kind) {
+                $result[] = ['name' => null, 'columns' => [$columnName]];
+            }
+        }
+        $table = $this->table($className);
+        if ($table !== null) {
+            foreach ($table->$kind as $name => $columns) {
+                $result[] = ['name' => is_string($name) ? $name : null, 'columns' => (array)$columns];
+            }
+        }
+        return $result;
     }
 
     protected function simpleClassName(string $fullClassName): string {
@@ -144,27 +202,109 @@ class EntityManager {
         $this->db->update($this->tableName($className), $data, $condition, $conditionParams);
     }
 
-    public function findById(string $className, mixed $id): Entity {
+    public function findById(string $className, mixed $id): ?Entity {
         $condition = $this->primaryKeyCondition($className);
         $safeTableName = $this->safeTableName($className);
         $sql = "select * from $safeTableName where $condition";
         $params = $this->primaryKeyConditionParams($className, $id);
         $result = $this->db->fetch($sql, $params, $className);
+        if (!$result instanceof Entity) {
+            return null;
+        }
         $result->setNew(false);
         $result->takeSnapshot($this->fetchDataArray($result));
         return $result;
     }
 
-    public function deleteById(string $className, mixed $id): void {
-        $sql = "delete from {$this->safeTableName($className)} where {$this->primaryKeyCondition($className)} limit 1";
-        $this->db->query($sql, $this->primaryKeyConditionParams($className, $id));
+    /**
+     * Fetches multiple entities by their primary key values
+     *
+     * Only works with single column primary keys.
+     *
+     * @return Entity[]
+     */
+    public function findByIds(string $className, array $ids): array {
+        if (empty($ids)) {
+            return [];
+        }
+        $safePk = $this->db->escapeName($this->singleColumnPrimaryKey($className));
+        [$condition, $params] = $this->db->getInConditionAndParams($ids);
+        $sql = "select * from {$this->safeTableName($className)} where $safePk in ($condition)";
+        $result = [];
+        foreach ($this->db->fetchAll($sql, $params, $className) as $entity) {
+            $entity->setNew(false);
+            $entity->takeSnapshot($this->fetchDataArray($entity));
+            $result[] = $entity;
+        }
+        return $result;
     }
 
+    /**
+     * Deletes an entity by its primary key value
+     *
+     * The entity is loaded before the delete so the before/after delete events carry its full
+     * previous state, which is what an auditing listener needs. Does nothing when the row is
+     * not found.
+     */
+    public function deleteById(string $className, mixed $id): void {
+        $entity = $this->findById($className, $id);
+        if ($entity === null) {
+            return;
+        }
+        $this->events->emit($entity->beforeDeleteEvent(), [$entity]);
+        $sql = "delete from {$this->safeTableName($className)} where {$this->primaryKeyCondition($className)} limit 1";
+        $this->db->query($sql, $this->primaryKeyConditionParams($className, $id), true);
+        $this->markDeleted($entity);
+        $this->events->emit($entity->afterDeleteEvent(), [$entity]);
+    }
+
+    /**
+     * Deletes multiple entities by their primary key values
+     *
+     * Like `deleteById()` the rows are loaded first so the events carry the previous state, which
+     * costs one extra select for the whole batch. Only works with single column primary keys.
+     */
     public function deleteByIds(string $className, array $ids): void {
-        $safePk = $this->db->escapeName($this->primaryKey($className));
+        if (empty($ids)) {
+            return;
+        }
+        $entities = $this->findByIds($className, $ids);
+        if (empty($entities)) {
+            return;
+        }
+        foreach ($entities as $entity) {
+            $this->events->emit($entity->beforeDeleteEvent(), [$entity]);
+        }
+        $safePk = $this->db->escapeName($this->singleColumnPrimaryKey($className));
         [$condition, $params] = $this->db->getInConditionAndParams($ids);
         $sql = "delete from {$this->safeTableName($className)} where $safePk in ($condition)";
-        $this->db->query($sql, $params);
+        $this->db->query($sql, $params, true);
+        foreach ($entities as $entity) {
+            $this->markDeleted($entity);
+            $this->events->emit($entity->afterDeleteEvent(), [$entity]);
+        }
+    }
+
+    /**
+     * Returns with the primary key name, throws when the entity has a composite primary key
+     */
+    protected function singleColumnPrimaryKey(string $className): string {
+        $primaryKey = $this->primaryKey($className);
+        if (is_array($primaryKey)) {
+            throw new EntityManagerException("Composite primary keys are not supported here: $className");
+        }
+        if ($primaryKey === null) {
+            throw new EntityManagerException("Primary key doesn't exist for $className");
+        }
+        return $primaryKey;
+    }
+
+    /**
+     * Puts an entity back into the "not persisted" state after its row was deleted
+     */
+    protected function markDeleted(Entity $entity): void {
+        $entity->setNew(true);
+        $entity->clearSnapshot();
     }
 
     public function save(Entity $entity): void {

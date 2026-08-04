@@ -75,6 +75,32 @@ class MariaQueryBuilder extends QueryBuilder {
         return $result;
     }
 
+    public function uniqueDefinition(?string $name, array $columns): string {
+        return 'unique key '.$this->constraintName($name, $columns, 'uq').' ('.$this->safeColumnList($columns).')';
+    }
+
+    public function indexDefinition(?string $name, array $columns): string {
+        return 'key '.$this->constraintName($name, $columns, 'idx').' ('.$this->safeColumnList($columns).')';
+    }
+
+    protected function constraintName(?string $name, array $columns, string $prefix): string {
+        if (!$name) {
+            $name = $prefix.'_'.join('_', $columns);
+        }
+        return $this->db->escapeName($name);
+    }
+
+    protected function safeColumnList(array $columns): string {
+        if (empty($columns)) {
+            throw new EntityManagerException("Constraint without columns: ".$this->currentColumn());
+        }
+        $safe = [];
+        foreach ($columns as $column) {
+            $safe[] = $this->db->escapeName($column);
+        }
+        return join(', ', $safe);
+    }
+
     public function isTableExist(string $dbNameParam, string $tableNameParam): string {
         return "select 1 from information_schema.tables where table_schema = $dbNameParam and table_name = $tableNameParam limit 1";
     }

@@ -35,5 +35,7 @@ class Column {
         public ?array $foreignKey = null,
         public ?string $onDelete = null,
         public ?string $onUpdate = null,
+        public bool $unique = false,
+        public bool $index = false,
     ) {}
 }

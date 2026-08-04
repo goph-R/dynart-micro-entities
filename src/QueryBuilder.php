@@ -21,6 +21,8 @@ abstract class QueryBuilder {
     abstract public function columnDefinition(string $columnName, Column $column): string;
     abstract public function primaryKeyDefinition(string $className): string;
     abstract public function foreignKeyDefinition(string $columnName, Column $column): string;
+    abstract public function uniqueDefinition(?string $name, array $columns): string;
+    abstract public function indexDefinition(?string $name, array $columns): string;
     abstract public function isTableExist(string $dbNameParam, string $tableNameParam): string;
     abstract public function listTables(): string;
     abstract public function describeTable(string $className): string;
@@ -47,6 +49,13 @@ abstract class QueryBuilder {
             }
         }
         $primaryKeyDef = $this->primaryKeyDefinition($className);
+        $allConstraintDef = [];
+        foreach ($this->em->uniqueConstraints($className) as $unique) {
+            $allConstraintDef[] = self::INDENTATION . $this->uniqueDefinition($unique['name'], $unique['columns']);
+        }
+        foreach ($this->em->indexes($className) as $index) {
+            $allConstraintDef[] = self::INDENTATION . $this->indexDefinition($index['name'], $index['columns']);
+        }
         $safeTableName = $this->em->safeTableName($className);
         $result = "create table ";
         if ($ifNotExists) {
@@ -56,6 +65,9 @@ abstract class QueryBuilder {
         $result .= join(",\n", $allColumnDef);
         if ($primaryKeyDef) {
             $result .= ",\n" . self::INDENTATION . $primaryKeyDef;
+        }
+        if (!empty($allConstraintDef)) {
+            $result .= ",\n" . join(",\n", $allConstraintDef);
         }
         if (!empty($allForeignKeyDef)) {
             $result .= ",\n" . join(",\n", $allForeignKeyDef);
@@ -136,13 +148,38 @@ abstract class QueryBuilder {
 
     protected function orderBy(Query $query): string {
         $orders = [];
-        $fieldNames = array_keys($query->fields());
+        $sortableFields = $this->sortableFields($query);
         foreach ($query->orderBy() as $orderBy) {
-            if (in_array($orderBy[0], $fieldNames)) {
+            if (in_array($orderBy[0], $sortableFields)) {
                 $orders[] = $this->db->escapeName($orderBy[0]).' '.($orderBy[1] == 'desc' ? 'desc' : 'asc');
             }
         }
         return $orders ? ' order by '.join(', ', $orders) : '';
+    }
+
+    /**
+     * Returns with the field names that are allowed in an order by
+     *
+     * The order by field name is whitelisted because it ends up in the SQL unquoted from the
+     * caller's point of view. Accepted are the aliases of aliased fields, the plain names of
+     * non-aliased ones, and - when the query selects everything from a table - every column of
+     * that table. Raw expressions (arrays) are never sortable by name.
+     */
+    protected function sortableFields(Query $query): array {
+        $fields = $query->fields();
+        if (empty($fields)) {
+            $from = $query->from();
+            return is_string($from) ? array_keys($this->em->tableColumns($from)) : [];
+        }
+        $result = [];
+        foreach ($fields as $as => $name) {
+            if (!is_int($as)) {
+                $result[] = $as;
+            } else if (!is_array($name)) {
+                $result[] = $name;
+            }
+        }
+        return $result;
     }
 
     protected function limit(Query $query): string {

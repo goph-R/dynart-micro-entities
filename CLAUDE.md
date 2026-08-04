@@ -138,5 +138,4 @@ entities.query_builder.max_limit = 1000
 
 ## Known Gotchas
 
-- **`Database::update()` param name collision** — condition params must not share a placeholder name with any column being updated. Use distinct names (e.g. `:oldName`) in the condition.
 - **`orderBy()` is whitelisted** — the order field name is checked against the query's selectable fields before it reaches the SQL. Accepted are aliases of aliased fields, plain names of non-aliased ones, and (when the query selects no explicit fields) every column of the source table. Raw expression fields are never sortable by name. An unmatched order field is silently dropped.

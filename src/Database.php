@@ -135,15 +135,34 @@ abstract class Database
         $this->query($sql, $params, true);
     }
 
+    /**
+     * The prefix of the placeholders generated for the SET clause
+     *
+     * The condition is written by the caller and can bind whatever names it likes, so the
+     * generated ones are namespaced to keep the two apart. Without it a condition binding `:name`
+     * while `name` is also being updated would overwrite the new value with the condition's, and
+     * the row would be updated to whatever it was being searched by - silently.
+     */
+    const UPDATE_PARAM_PREFIX = ':set_';
+
     public function update(string $tableName, array $data, string $condition = '', array $conditionParams = []): void {
         $tableName = $this->escapeName($tableName);
         $params = [];
         $pairs = [];
         foreach ($data as $name => $value) {
-            $pairs[] = $this->escapeName($name) . ' = :' . $name;
-            $params[':' . $name] = $value;
+            $paramName = self::UPDATE_PARAM_PREFIX . $name;
+            $pairs[] = $this->escapeName($name) . ' = ' . $paramName;
+            $params[$paramName] = $value;
         }
-        $params = array_merge($params, $conditionParams);
+        foreach ($conditionParams as $name => $value) {
+            if (array_key_exists($name, $params)) {
+                throw new EntityManagerException(
+                    "The condition parameter '$name' collides with a generated one."
+                    ." Don't start a condition parameter name with '".self::UPDATE_PARAM_PREFIX."'."
+                );
+            }
+            $params[$name] = $value;
+        }
         $pairsString = join(', ', $pairs);
         $where = $condition ? ' where ' . $condition : '';
         $sql = "update $tableName set $pairsString$where";

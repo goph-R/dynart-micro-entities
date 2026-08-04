@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.4.1] &ndash; 2026-08-04
+
+### Fixed
+- **`Database::update()` could overwrite a SET value with a condition value.** The SET placeholders were named after their columns, so a condition binding `:name` while `name` was also being updated lost the new value to the condition's — the row was "updated" to what it was being searched by, with no error anywhere. The generated placeholders are now prefixed (`:set_name`), and a condition parameter that collides with a generated one throws instead of being merged silently. The documented "use distinct names in the condition" gotcha no longer applies.
+
+---
+
 ## [0.4.0] &ndash; 2026-08-04
 
 ### Changed

@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.6.1] &ndash; 2026-08-05
+
+### Fixed
+- **A `false` was written as an empty string.** `PDOStatement::execute()` binds every value in the array as a string, and `false` as a string is `''`. A server in strict mode — the default in MySQL since 5.7 and MariaDB since 10.2 — refuses `''` for an integer column, so writing a `bool` field was `SQLSTATE[22007]: Incorrect integer value: ''` rather than a zero. `Database::query()` now binds booleans as 0 and 1, in the one place every insert, update and condition passes through, so a boolean bound by hand in a `where` is covered too.
+
+### Notes
+This is the kind of bug a lenient server hides. Without `STRICT_TRANS_TABLES` the empty string is coerced to 0 and nothing is said, so the write appears to work on every machine it is developed on and then fails on the first correctly configured one — in dpress's case on the first row of `dpress install`, which writes `removable = false` for the admin role.
+
+The regression test sets strict mode for its own connection rather than assuming the suite is pointed at a server that has it, and restores what it found.
+
+---
+
 ## [0.6.0] &ndash; 2026-08-04
 
 ### Added

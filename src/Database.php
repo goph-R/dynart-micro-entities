@@ -38,6 +38,7 @@ abstract class Database
     }
 
     public function query(string $query, array $params = [], bool $closeCursor = false): PDOStatement {
+        $params = $this->bindable($params);
         try {
             $this->connect();
             $query = $this->replaceClassHashNamesWithTableNames($query);
@@ -54,6 +55,30 @@ abstract class Database
             $stmt->closeCursor();
         }
         return $stmt;
+    }
+
+    /**
+     * Parameters PDO can bind without changing what they mean
+     *
+     * `PDOStatement::execute()` binds every value in the array as a string, and `false` as a
+     * string is `''`. A database in strict mode - which is the default in MySQL since 5.7 and
+     * in MariaDB since 10.2 - refuses `''` for an integer column, so a `bool` field on its way
+     * into a `tinyint` is an error rather than a zero. Worse, it is an error *only* on the
+     * servers that are configured correctly: a lenient one coerces the empty string to 0 and
+     * says nothing, so `false` appears to work everywhere it is written and then fails on the
+     * first install somewhere else.
+     *
+     * Here rather than at each call site, because this is the one place every insert, update
+     * and condition passes through, and a boolean bound by hand in a `where` has the same
+     * problem. `null` is left alone: PDO binds that as SQL NULL, which is what it means.
+     */
+    protected function bindable(array $params): array {
+        foreach ($params as $name => $value) {
+            if (is_bool($value)) {
+                $params[$name] = (int)$value;
+            }
+        }
+        return $params;
     }
 
     /**

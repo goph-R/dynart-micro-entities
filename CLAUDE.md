@@ -30,6 +30,10 @@ Config keys use the pattern `database.{configName}.{key}` (default config name i
 > **INI gotcha:** DSN values containing `=` must be quoted in the INI file:
 > `database.default.dsn = "mysql:host=localhost"` — bare `=` breaks `parse_ini_file` with `INI_SCANNER_TYPED`.
 
+**Booleans are bound as 0 and 1**, in `query()`, before `execute()` sees them. PDO binds every parameter as a string and `false` as a string is `''`, which a server in strict mode refuses for an integer column — so a `bool` field wrote fine on a lenient machine and failed on a correctly configured one. Anything else added to that path should be normalised in the same place rather than at the call sites, which is where the casts used to live and get forgotten.
+
+**Test against a strict server.** `STRICT_TRANS_TABLES` is the default in MySQL since 5.7 and MariaDB since 10.2, but XAMPP ships without it, so this whole class of bug is invisible locally. `DatabaseTest` sets it for its own connection.
+
 ### Entity System
 
 `Entity` (abstract) — base for all persistent objects. Tracks new/persisted state (`isNew`/`setNew`). Dirty-tracking via snapshot (`takeSnapshot`, `getDirtyFields`, `isDirty`, `clearSnapshot`, `snapshot`). Provides lifecycle event name helpers (`beforeSaveEvent`, `afterSaveEvent`, `beforeDeleteEvent`, `afterDeleteEvent`).

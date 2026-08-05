@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.7.0] &ndash; 2026-08-05
+
+### Added
+- **`QueryExecutor::addColumnWithAudit()`**, plus `addColumn()` / `addAuditColumn()` and the `QueryBuilder::addColumnByName()` / `addAuditColumnByName()` behind them. Adding a column to a live table was the one ordinary schema change with no support at all — create, drop, rename and add-foreign-key were there, and a migration that needed a new column had to write MariaDB-specific `alter table` by hand.
+
+### Notes
+The definition comes from the same `#[Column]` metadata the `CREATE TABLE` is built from, which is the whole point: a column added to an existing table and the same column on a fresh install cannot drift, and they would drift the first time somebody edited the attribute without touching the migration.
+
+**`addColumnWithAudit()` is the one to call from a migration.** Every audited write copies the whole row into the `_aud` mirror, so a source table carrying a column its mirror lacks is not a cosmetic difference — the next save of *any* row of that class fails with `Unknown column`. Doing both from one call is what stops that being something each migration has to remember. The mirror keeps its own rules, so the added column arrives there without auto-increment, without the unique constraint and without the foreign key, exactly as it would on a fresh install.
+
+There is no `if not exists`: a migration is recorded once it succeeds, so adding a column twice is not a path anybody should be on.
+
+---
+
 ## [0.6.1] &ndash; 2026-08-05
 
 ### Fixed

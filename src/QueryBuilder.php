@@ -26,6 +26,8 @@ abstract class QueryBuilder {
     abstract public function dropTable(string $safeTableName, bool $ifExists): string;
     abstract public function renameTable(string $safeFromName, string $safeToName): string;
     abstract public function addForeignKey(string $safeTableName, string $definition): string;
+
+    abstract public function addColumn(string $safeTableName, string $definition): string;
     abstract public function isTableExist(string $dbNameParam, string $tableNameParam): string;
     abstract public function listTables(): string;
     abstract public function describeTable(string $className): string;
@@ -190,6 +192,52 @@ abstract class QueryBuilder {
             throw new EntityManagerException("$className::\$$columnName has no foreign key to add.");
         }
         return $this->addForeignKey($this->em->safeTableName($className), $definition);
+    }
+
+    /**
+     * Adds a column that the table was created without
+     *
+     * The definition comes from the same `#[Column]` metadata the `create table` is built from,
+     * so a column added to a live table and the same column on a fresh install cannot differ -
+     * which is the whole reason this exists rather than an `alter table` written by hand in a
+     * migration, where the two drift the first time the attribute is edited.
+     *
+     * There is no `if not exists`: a migration is recorded once it succeeds, so adding a column
+     * twice is not a path anybody should be on.
+     */
+    public function addColumnByName(string $className, string $columnName): string {
+        return $this->buildAddColumn(
+            $className, $columnName, $this->em->tableColumns($className), $this->em->safeTableName($className)
+        );
+    }
+
+    /**
+     * The same column on the audit mirror
+     *
+     * **Both or neither.** Every audited write copies the whole row into the mirror, so a source
+     * table that has a column its mirror does not is not a cosmetic difference: the next save of
+     * that entity fails on the column count, and it fails for every entity of that class rather
+     * than for the one being changed.
+     *
+     * The definition is taken from `auditColumns()`, so the mirror keeps its own rules - no auto
+     * increment, no unique constraint, no foreign key - exactly as it would on a fresh install.
+     */
+    public function addAuditColumnByName(string $className, string $columnName): string {
+        return $this->buildAddColumn(
+            $className, $columnName, $this->auditColumns($className), $this->em->safeAuditTableName($className)
+        );
+    }
+
+    /**
+     * @param Column[] $columns
+     */
+    protected function buildAddColumn(string $className, string $columnName, array $columns, string $safeTableName): string {
+        if (!array_key_exists($columnName, $columns)) {
+            throw new EntityManagerException("There is no column '$columnName' in $className.");
+        }
+        $this->currentClassNameForException = $className;
+        $this->currentColumnNameForException = $columnName;
+        return $this->addColumn($safeTableName, $this->columnDefinition($columnName, $columns[$columnName]));
     }
 
     // TODO: public function findAllUnion(array $queries): string

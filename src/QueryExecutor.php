@@ -86,6 +86,29 @@ class QueryExecutor {
      *
      * For a column that references an entity introduced after its own table was created.
      */
+    /**
+     * Adds a column to an existing table, and to its audit mirror when it has one
+     *
+     * **This is the one to call from a migration.** Adding the column to the source table alone
+     * leaves the mirror a column short, and the next audited save of that entity fails on the
+     * column count - for every entity of that class, not just the row being written. Doing both
+     * from one call is what stops that from being something a migration has to remember.
+     */
+    public function addColumnWithAudit(string $className, string $columnName): void {
+        $this->addColumn($className, $columnName);
+        if ($this->em->isAuditable($className)) {
+            $this->addAuditColumn($className, $columnName);
+        }
+    }
+
+    public function addColumn(string $className, string $columnName): void {
+        $this->db->query($this->queryBuilder->addColumnByName($className, $columnName));
+    }
+
+    public function addAuditColumn(string $className, string $columnName): void {
+        $this->db->query($this->queryBuilder->addAuditColumnByName($className, $columnName));
+    }
+
     public function addForeignKey(string $className, string $columnName): void {
         $this->db->query($this->queryBuilder->addForeignKeyByColumn($className, $columnName));
     }

@@ -58,6 +58,10 @@ class MariaQueryBuilder extends QueryBuilder {
         return 'alter table '.$safeTableName.' add '.$definition;
     }
 
+    public function addColumn(string $safeTableName, string $definition): string {
+        return 'alter table '.$safeTableName.' add column '.$definition;
+    }
+
     public function foreignKeyDefinition(string $columnName, Column $column): string {
         if ($column->foreignKey === null) {
             return '';

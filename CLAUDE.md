@@ -81,6 +81,8 @@ Wiring: `AuditService::subscribeAll()` must run *after* the attribute processor.
 
 `Migrations` — register classes with `add()`, then `run()` applies every pending one in ascending version order and records it in the `MigrationHistory` table. The registry is open so plugins can add their own; versions interleave by sort order.
 
+**Adding a column to a live table is `QueryExecutor::addColumnWithAudit()`**, never hand-written `alter table` in a migration — the definition then comes from the same `#[Column]` metadata as the `CREATE TABLE`, so a live table and a fresh install cannot drift. It does the `_aud` mirror as well, and that is not optional: an audited write copies the whole row, so a mirror one column short fails the next save of every entity of that class.
+
 There is **no `down()`** — a mistake is corrected by a new migration. Each migration is recorded as soon as it succeeds, so a failure part-way leaves the earlier ones applied and the run can be repeated. Wrapping the run in a transaction would not help: DDL commits implicitly in MariaDB.
 
 ### Query System

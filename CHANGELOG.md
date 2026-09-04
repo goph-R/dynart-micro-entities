@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.7.1] &ndash; 2026-09-05
+
+### Fixed
+- **The connection asked for `utf8`, which is three bytes per character.** `MariaDatabase::connect()` ran `set names 'utf8'`, and MySQL's `utf8` covers every character except the ones people notice are missing: an emoji is four bytes. On a three byte connection it is not stored badly - it is stored as `????`, with no error anywhere, and the text is gone by the time anybody looks at the page. It asks for `utf8mb4` now.
+
+### Notes
+The connection is only half of it. A **table** created while the database default was `utf8` keeps that until it is converted, so an existing schema wants:
+
+```sql
+alter database `<name>` character set utf8mb4 collate utf8mb4_unicode_ci;
+alter table `<name>` convert to character set utf8mb4 collate utf8mb4_unicode_ci;
+```
+
+`CREATE TABLE` here writes no charset of its own, on purpose - a table inherits the database, which is where an application should be making that decision.
+
 ## [0.7.0] &ndash; 2026-08-05
 
 ### Added
